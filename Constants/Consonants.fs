@@ -1,5 +1,7 @@
 module OnlineConlang.Constants.Consonants
 
+open OnlineConlang.Foundation
+
 type MannerArticulation = Nasal
                         | Plosive
                         | SibilantAffricate
@@ -39,12 +41,50 @@ type MannerArticulationClick = TenuisNonLateral
 type PulmonicConsonant =
     | BasicConsonant of PlaceArticulation * MannerArticulation * Voicedness * string
     | CoArtConsonant of PlaceArticulation * PlaceArticulation * MannerArticulation * Voicedness * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | BasicConsonant (_, _, _, s) -> s
+            | CoArtConsonant (_, _, _, _, s) -> s
 
-type EjectiveConsonant = EjectiveConsonant of PlaceArticulation * MannerArticulation * string
+type EjectiveConsonant =
+    | EjectiveConsonant of PlaceArticulation * MannerArticulation * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | EjectiveConsonant (_, _, s) -> s
 
-type ClickConsonant = ClickConsonant of PlaceArticulation * PlaceArticulation * MannerArticulationClick * string
+type ClickConsonant =
+    | ClickConsonant of PlaceArticulation * PlaceArticulation * MannerArticulationClick * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | ClickConsonant (_, _, _, s) -> s
 
-type ImplosiveConsonant = ImplosiveConsonant of PlaceArticulation * Voicedness * string
+type ImplosiveConsonant =
+    | ImplosiveConsonant of PlaceArticulation * Voicedness * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | ImplosiveConsonant (_, _, s) -> s
+
+type Consonant =
+    | Pulmonic of PulmonicConsonant
+    | Ejective of EjectiveConsonant
+    | Click of ClickConsonant
+    | Implosive of ImplosiveConsonant
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | Pulmonic  c -> c.IPASymbol
+            | Ejective  c -> c.IPASymbol
+            | Click     c -> c.IPASymbol
+            | Implosive c -> c.IPASymbol
 
 let pulmonicConsonants = Set.ofList [
     BasicConsonant (Bilabial, Nasal, Unvoiced, "m̥")

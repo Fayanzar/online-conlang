@@ -1,7 +1,27 @@
 module OnlineConlang.App
 
+open SharedModels
+
+open Foundation
+
+open OnlineConlang.Api.Class
+open OnlineConlang.Api.Language
+open OnlineConlang.Api.SpeechPart
+open OnlineConlang.Api.Term
+open OnlineConlang.Api.Transcription
+open OnlineConlang.Api.Axes
+open OnlineConlang.Api.Phonemes
+open OnlineConlang.Api.User
+
+open OnlineConlang.DB.Context
+open OnlineConlang.Import.Morphology
+open OnlineConlang.Import.Phonotactics
+open OnlineConlang.Import.Phonology
+open OnlineConlang.Import.User
+
 open System
 open System.IO
+open System.Text.Json
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
@@ -10,6 +30,9 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
+
+open Fable.Remoting.Server
+open Fable.Remoting.Giraffe
 
 // ---------------------------------
 // Models
@@ -51,27 +74,108 @@ module Views =
 // Web app
 // ---------------------------------
 
-let indexHandler (name : string) =
-    fun (next : HttpFunc) (ctx : HttpContext) ->
-        let greetings = $"Hi, {name}!"
-        let model     = { Text = greetings }
-        let view      = Views.index model
-        htmlView view next ctx
+type SecurityToken = SecurityToken of string
 
-let webApp =
-    choose [
-        GET >=>
-            choose [
-                route "/" >=> indexHandler "world"
-                routef "/hello/%s" indexHandler
-            ]
-        POST >=>
-            choose [ ]
-        setStatusCode 404 >=> text "Not Found" ]
+// possible errors when logging in
+type LoginError =
+    | UserDoesNotExist
+    | PasswordIncorrect
+    | AccountBanned
 
-// ---------------------------------
-// Error handler
-// ---------------------------------
+// a request with a token
+type SecureRequest<'T> = { token : SecurityToken; content : 'T }
+
+// possible authentication/authorization errors
+type AuthenticationError =
+   | UserTokenExpired
+   | TokenInvalid
+   | UserDoesNotHaveAccess
+
+let server (logger : ILogger) : IServer = {
+    postLogin = postLoginUserHandler logger
+    postLogout = postLogoutUserHandler logger
+    postRegister = postRegisterUserHandler logger
+    postVerifyUser = postVerifyUserHandler logger
+    postSendVerificationEmail = postSendVerificationEmailHandler logger
+
+    getUser = getUserHandler logger
+
+    getLanguages = getLanguagesHandler logger
+    deleteLanguage = deleteLanguageHandler logger
+    postLanguage = postLanguageHandler logger
+    putLanguage = putLanguageHandler logger
+
+    getClasses = getClassesHandler logger
+    postClass = postClassHandler logger
+    putClass = putClassHandler logger
+    deleteClass = deleteClassHandler logger
+
+    postClassValue = postClassValueHandler logger
+    putClassValue = putClassValueHandler logger
+    deleteClassValue = deleteClassValueHandler logger
+
+    getSpeechParts = getSpeechPartsHandler logger
+    postSpeechPart = postSpeechPartHandler logger
+    putSpeechPart = putSpeechPartHandler logger
+    deleteSpeechPart = deleteSpeechPartHandler logger
+
+    getTranscriptions = getTranscriptionsHandler logger
+    postTranscription = postTranscriptionHandler logger
+    putTranscription = putTranscriptionHandler logger
+    deleteTranscription = deleteTranscriptionHandler logger
+
+    getTerms = getTermsHandler logger
+    postTerm = postTermHandler logger
+    putTerm = putTermHandler logger
+    deleteTerm = deleteTermHandler logger
+
+    rebuildInflections = postRebuildInflectionsHandler logger
+
+    getAxes = getAxesHandler logger
+    postAxisName = postAxisNameHandler logger
+    putAxisName = putAxisNameHandler logger
+    deleteAxisName = deleteAxisNameHandler logger
+
+    postAxisValue = postAxisValueHandler logger
+    putAxisValue = putAxisValueHandler logger
+    deleteAxisValue = deleteAxisValueHandler logger
+
+    getAxisRules = getAxisRulesHandler logger
+    postAxisRules = postAxisRulesHandler logger
+    putAxisRule = putAxisRuleHandler logger
+    deleteAxisRule = deleteAxisRuleHandler logger
+
+    getOverrideRules = getOverrideRulesHandler logger
+    postOverrideRules = postOverrideRulesHandler logger
+    putOverrideRule = putOverrideRuleHandler logger
+    deleteOverrideRule = deleteOverrideRuleHandler logger
+
+    getInflections = getInflectionsHandler logger
+    getInflectionsStructure = getInflectionsStructureHandler logger
+    postInflection = postInflectionHandler logger
+    putInflection = putInflectionHandler logger
+    deleteInflection = deleteInflectionHandler logger
+
+    postPhonemeClass = postPhonemeClassHandler logger
+    putPhonemeClass = putPhonemeClassHandler logger
+    deletePhonemeClass = deletePhonemeClassHandler logger
+}
+
+let serverAPI (ctx: HttpContext) : IServer =
+    let logger = ctx.GetLogger("CLG")
+    server logger
+
+let fableErrorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) =
+    printfn "Error at %s on method %s" routeInfo.path routeInfo.methodName
+    let customError = { errorMsg = ex.Message }
+    Propagate customError
+
+let webApp : HttpHandler =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder routeBuilder
+    |> Remoting.withErrorHandler fableErrorHandler
+    |> Remoting.fromContext serverAPI
+    |> Remoting.buildHttpHandler
 
 let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
@@ -82,13 +186,13 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 // ---------------------------------
 
 let configureCors (builder : CorsPolicyBuilder) =
+    let origins = config.cors.``allowed-origins``
+                |> Seq.map (fun uri -> uri.ToString().TrimEnd('/')) |> Seq.toArray
     builder
-        .WithOrigins(
-            "http://localhost:5000",
-            "https://localhost:5001")
-       .AllowAnyMethod()
-       .AllowAnyHeader()
-       |> ignore
+        .WithOrigins(origins)
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        |> ignore
 
 let configureApp (app : IApplicationBuilder) =
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
@@ -105,6 +209,7 @@ let configureApp (app : IApplicationBuilder) =
 let configureServices (services : IServiceCollection) =
     services.AddCors()    |> ignore
     services.AddGiraffe() |> ignore
+    services.AddSingleton<Json.ISerializer>(SystemTextJson.Serializer(jsonOptions)) |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()
@@ -112,14 +217,40 @@ let configureLogging (builder : ILoggingBuilder) =
 
 [<EntryPoint>]
 let main args =
+    config.Load(@"config.yaml")
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
+    let phonemes = query {
+        for p in ctx.MarraidhConlang.Phoneme do
+        select p
+    }
+    if Seq.isEmpty phonemes then
+        for p in IPA.Consonants do
+            let row = ctx.MarraidhConlang.Phoneme.Create()
+            row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
+        for p in IPA.Vowels do
+            let row = ctx.MarraidhConlang.Phoneme.Create()
+            row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
+        ctx.SubmitUpdates()
+    let languages = query {
+        for l in ctx.MarraidhConlang.Language do
+        select l.Id
+    }
+    for lid in (Seq.toList languages) do
+        updateInflectTransformations lid
+        updatePhonemeClasses lid
+
+    updateUsersLanguages
+
+    let urls = config.baseUrls
+            |> Seq.map (fun uri -> uri.ToString().TrimEnd('/')) |> Seq.toArray
     Host.CreateDefaultBuilder(args)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
                 webHostBuilder
                     .UseContentRoot(contentRoot)
                     .UseWebRoot(webRoot)
+                    .UseUrls(urls)
                     .Configure(Action<IApplicationBuilder> configureApp)
                     .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)
