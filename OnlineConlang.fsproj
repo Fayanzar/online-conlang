@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Prelude.fs" />
+    <Compile Include="Constants\Diacritics.fs" />
     <Compile Include="Constants\Consonants.fs" />
     <Compile Include="Constants\Vowels.fs" />
     <Compile Include="Storage\Memory.fs" />
