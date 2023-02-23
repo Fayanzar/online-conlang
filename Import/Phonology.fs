@@ -2,6 +2,7 @@ module OnlineConlang.Import.Phonology
 
 open OnlineConlang.Constants.Diacritics
 open OnlineConlang.Constants.Consonants
+open OnlineConlang.Constants.Tones
 open OnlineConlang.Constants.Vowels
 open OnlineConlang.Prelude
 
@@ -14,3 +15,4 @@ type IPA =
         Set.map Implosive implosiveConsonants
     static member Vowels = vowels
     static member Diacritics = diacritics
+    static member Tones = tones
