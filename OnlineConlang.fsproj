@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="Prelude.fs" />
     <Compile Include="Constants\Consonants.fs" />
+    <Compile Include="Constants\Vowels.fs" />
     <Compile Include="Storage\Memory.fs" />
     <Compile Include="Storage\File.fs" />
     <Compile Include="Import\Phonology.fs" />

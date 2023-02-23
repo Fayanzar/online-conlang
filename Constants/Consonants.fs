@@ -46,6 +46,11 @@ type ClickConsonant = ClickConsonant of PlaceArticulation * PlaceArticulation * 
 
 type ImplosiveConsonant = ImplosiveConsonant of PlaceArticulation * Voicedness * string
 
+type Consonant = Pulmonic of PulmonicConsonant
+               | Ejective of EjectiveConsonant
+               | Click of ClickConsonant
+               | Implosive of ImplosiveConsonant
+
 let pulmonicConsonants = Set.ofList [
     BasicConsonant (Bilabial, Nasal, Unvoiced, "m̥")
     BasicConsonant (Bilabial, Nasal, Voiced, "m")

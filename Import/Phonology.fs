@@ -1,12 +1,8 @@
 module OnlineConlang.Import.Phonology
 
 open OnlineConlang.Constants.Consonants
+open OnlineConlang.Constants.Vowels
 open OnlineConlang.Prelude
-
-type Consonant = Pulmonic of PulmonicConsonant
-               | Ejective of EjectiveConsonant
-               | Click of ClickConsonant
-               | Implosive of ImplosiveConsonant
 
 [<AbstractClass; Sealed>]
 type IPA =
@@ -15,3 +11,4 @@ type IPA =
         Set.map Ejective ejectiveConsonants </Set.union/>
         Set.map Click clickConsonants </Set.union/>
         Set.map Implosive implosiveConsonants
+    static member Vowels = vowels
