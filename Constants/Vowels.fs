@@ -1,5 +1,7 @@
 module OnlineConlang.Constants.Vowels
 
+open OnlineConlang.Foundation
+
 type Height =
     | Open = 0
     | NearOpen = 1
@@ -18,7 +20,13 @@ type Backness =
 
 type Roundedness = Rounded | Unrounded
 
-type Vowel = Vowel of Height * Backness * Roundedness * string
+type Vowel =
+    | Vowel of Height * Backness * Roundedness * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | Vowel (_, _, _, s) -> s
 
 let vowels = Set.ofList [
     Vowel (Height.Close, Backness.Front, Unrounded, "i")

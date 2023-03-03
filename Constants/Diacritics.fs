@@ -1,5 +1,7 @@
 module OnlineConlang.Constants.Diacritics
 
+open OnlineConlang.Foundation
+
 type Location =
     | Above
     | Below
@@ -43,7 +45,13 @@ type Phonation =
     | Ejective
     | Affricate
 
-type Diacritic = Diacritic of Phonation * Location * string
+type Diacritic =
+    | Diacritic of Phonation * Location * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | Diacritic (_, _, s) -> s
 
 let diacritics = Set.ofList [
     Diacritic (Voiceless, Below, "̥")

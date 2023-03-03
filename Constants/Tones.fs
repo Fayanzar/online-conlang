@@ -1,5 +1,7 @@
 module OnlineConlang.Constants.Tones
 
+open OnlineConlang.Foundation
+
 type ToneMark =
     | Diacritic
     | Chao
@@ -24,7 +26,13 @@ type Pitch =
     | Peaking
     | Dipping
 
-type Tone = Tone of Pitch * ToneMark * string
+type Tone =
+    | Tone of Pitch * ToneMark * string
+    member this.IPASymbol = (this :> IIPARepresentable).IPASymbol
+    interface IIPARepresentable with
+        member this.IPASymbol =
+            match this with
+            | Tone (_, _, s) -> s
 
 let tones = Set.ofList [
     Tone (Top, Diacritic, "̋")
