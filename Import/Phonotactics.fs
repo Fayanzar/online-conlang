@@ -89,13 +89,20 @@ let mutable phonemeClasses =
                                 ("V", map VowelPhoneme IPA.Vowels)
     consonantsAndVowels
 
-type TransformationChain = Transformation list * string
+type TChain =
+    | Forward of (string * Transformation) list * string
+    | Reverse of string * (Transformation * string) list
+    with
+    member this.Rev =
+        match this with
+        | Forward (l, s) -> Reverse (s, rev <| map (fun (x, y) -> (y, x)) l)
+        | Reverse (s, l) -> Forward (rev <| map (fun (x, y) -> (y, x)) l, s)
 
 let private getPhonemeSymbols phonemeSet =
     phonemeSet |> map (fun (p : Phoneme) -> p.IPASymbol)
 
 let rec private classifyTranscriptionChars' s acc (phonemeTree : PhonemeClasses) =
-    match Seq.toList s with
+    match toList s with
     | [] ->
         let onode = phonemeTree.findLowestChild
                         (fun ps -> Set.contains acc <| getPhonemeSymbols ps)
@@ -121,3 +128,49 @@ let rec private classifyTranscriptionChars' s acc (phonemeTree : PhonemeClasses)
 
 let classifyTranscriptionChars s =
     classifyTranscriptionChars' s "" phonemeClasses
+
+let rec private getSubLists l =
+    [ yield l
+      for x in toList l do
+        let rest = toList l |> List.except [x]
+        yield string rest
+        yield! getSubLists (string rest)
+    ]
+
+let rec private cartesian (p1 : string list) p2 =
+    match p1, p2 with
+    | _, [] -> []
+    | [], _ -> []
+    | x::xs, _ -> (map (fun y -> x + y) p2) @ (cartesian xs p2)
+
+
+let syllableVariations (syllableBase : string) =
+    let splitSyllable = syllableBase.Split 'V' |> toList
+    let part1 = head splitSyllable |> getSubLists |> map (fun s -> s + "V")
+    let part2 = fold (+) "" splitSyllable.Tail |> getSubLists
+    cartesian part1 part2 |> sortBy length |> List.rev
+
+let rec private syllabify' (s : string) syllable (vars : string list) acc =
+    match s, vars with
+    | "", _    -> Some acc
+    | _, x::xs ->
+        if s.StartsWith x then syllabify' (s.Substring <| length x) syllable (syllableVariations syllable) (x::acc)
+                          else syllabify' s syllable xs acc
+    | _, []    -> None
+
+let syllabify s syllable = syllabify' s syllable (syllableVariations syllable) []
+
+let rec private insertDots s syllableLengths k =
+    match toList s, syllableLengths with
+    | x::xs, y::ys ->
+        if y = k then insertDots (string (x :: '.' :: xs)) ys k
+                     else insertDots s syllableLengths (k + 1)
+    | _, _ -> s
+
+let syllabifyTranscription t syllable =
+    let tClassified = classifyTranscriptionChars t
+    match syllabify tClassified syllable with
+    | None -> t
+    | Some tSyllabified ->
+        let syllableLengths = map length tSyllabified
+        insertDots t syllableLengths 1
