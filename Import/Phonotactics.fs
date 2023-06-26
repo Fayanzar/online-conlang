@@ -1,9 +1,13 @@
 module OnlineConlang.Import.Phonotactics
 
+open FSharpPlus
+
 open OnlineConlang.Import.Phonology
 open OnlineConlang.Import.Transformations
 
-open FSharpPlus
+let mutable transcriptionTransformations : (Transformation list) = []
+
+let mutable syllable : string = ""
 
 type PhonemeClasses =
     | Node of string * Phoneme Set * PhonemeClasses list
@@ -89,15 +93,6 @@ let mutable phonemeClasses =
                                 ("V", map VowelPhoneme IPA.Vowels)
     consonantsAndVowels
 
-type TChain =
-    | Forward of (string * Transformation) list * string
-    | Reverse of string * (Transformation * string) list
-    with
-    member this.Rev =
-        match this with
-        | Forward (l, s) -> Reverse (s, rev <| map (fun (x, y) -> (y, x)) l)
-        | Reverse (s, l) -> Forward (rev <| map (fun (x, y) -> (y, x)) l, s)
-
 let private getPhonemeSymbols phonemeSet =
     phonemeSet |> map (fun (p : Phoneme) -> p.IPASymbol)
 
@@ -167,6 +162,17 @@ let rec private insertDots s syllableLengths k =
                      else insertDots s syllableLengths (k + 1)
     | _, _ -> s
 
+let rec private moveDots (t : char list) inj (word : char list) (k : int) acc =
+    match inj with
+    | ((x1, x2), (y1, y2))::xs ->
+        let sub1 = t[x1 + k .. x2 + k]
+        let sub2 = word[y1 .. y2]
+        let dotCount = filter ((=) '.') sub1 |> length
+        match dotCount with
+        | 0 -> moveDots t xs word k (acc @ sub2)
+        | n -> moveDots t xs word (k + n) (acc @ sub2 @ List.replicate n '.')
+    | _ -> acc
+
 let syllabifyTranscription t syllable =
     let tClassified = classifyTranscriptionChars t
     match syllabify tClassified syllable with
@@ -174,3 +180,33 @@ let syllabifyTranscription t syllable =
     | Some tSyllabified ->
         let syllableLengths = map length tSyllabified
         insertDots t syllableLengths 1
+
+let rec private contractChain chain =
+    match chain with
+    | Reverse (transcription, chainList) ->
+        match chainList with
+        | [] -> transcription
+        | (transformation, word)::xs ->
+            let newWord = moveDots (toList transcription)
+                                   (Map.toList transformation.RevInjection)
+                                   (toList word)
+                                   0
+                                   [] |> string
+            contractChain <| Reverse (newWord, xs)
+    | _ -> ""
+
+let SyllabifyWord word transformations syllable =
+    let tChain = mkTChain word transformations
+    match tChain with
+    | Forward (chain, t) ->
+        let sTranscription = syllabifyTranscription t syllable
+        let newChain = rev <| map (fun (x, y) -> (y, x)) chain
+        let revTChain = Reverse (sTranscription, newChain)
+        contractChain revTChain
+    | _ -> word
+
+let transcribeWord word transformations =
+    let tChain = mkTChain word transformations
+    match tChain with
+    | Forward (_, t) -> t
+    | _ -> word
