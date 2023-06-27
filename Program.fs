@@ -1,5 +1,8 @@
 module OnlineConlang.App
 
+open OnlineConlang.Api.Language
+open OnlineConlang.Api.Term
+
 open System
 open System.IO
 open Microsoft.AspNetCore.Builder
@@ -66,7 +69,14 @@ let webApp =
                 routef "/hello/%s" indexHandler
             ]
         POST >=>
-            choose [ ]
+            choose [
+                routef "/language/%s" postLanguageHandler
+                routef "/language/%d" postTermHandler
+            ]
+        DELETE >=>
+            choose [
+                routef "/language/%s" deleteLanguageHandler
+            ]
         setStatusCode 404 >=> text "Not Found" ]
 
 // ---------------------------------

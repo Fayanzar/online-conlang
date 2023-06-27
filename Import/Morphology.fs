@@ -40,6 +40,8 @@ type RuleSet = Rule list
 
 type PartOfSpeech = string
 
+type Class = string
+
 type Axis =
     {
         name         : string
