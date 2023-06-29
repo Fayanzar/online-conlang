@@ -29,6 +29,8 @@
     <Compile Include="Import\Phonotactics.fs" />
     <Compile Include="Import\Morphology.fs" />
     <Compile Include="Import\Term.fs" />
+    <Compile Include="Api\Class.fs" />
+    <Compile Include="Api\SpeechPart.fs" />
     <Compile Include="Api\Transcription.fs" />
     <Compile Include="Api\Language.fs" />
     <Compile Include="Api\Term.fs" />

@@ -7,6 +7,7 @@ open OnlineConlang.DB.Context
 open OnlineConlang.Import.Term
 
 open FSharp.Data.Sql
+open FSharp.Json
 open Giraffe
 open Microsoft.AspNetCore.Http
 
@@ -16,14 +17,14 @@ let postTermHandler lid =
             let! term = hctx.BindJsonAsync<Term>()
             let! wordClass =
                 query {
-                    for c in ctx.Conlang.ClassName do
-                    where (c.Name = term.wordClass)
-                    select (c)
+                    for cv in ctx.Conlang.ClassValue do
+                    where (cv.Name = term.wordClass && cv.Language = lid)
+                    select (cv)
                 } |> Seq.executeQueryAsync
             let! partOfSpeech =
                 query {
                     for p in ctx.Conlang.SpeechPart do
-                    where (p.Name = term.speechPart)
+                    where (p.Name = term.speechPart && p.Language = lid)
                     select (p)
                 } |> Seq.executeQueryAsync
             match toList wordClass, toList partOfSpeech with
@@ -35,6 +36,19 @@ let postTermHandler lid =
                 row.Language <- lid
                 row.Class <- Some term.wordClass
                 row.SpeechPart <- Some term.speechPart
+
+                let transcription =
+                    match term.transcription with
+                    | None   -> term.mkTranscription lid
+                    | Some t -> t
+
+                let inflection =
+                    match term.inflection with
+                    | None   -> term.mkInflections lid
+                    | Some i -> i
+
+                row.Transcription <- Some transcription
+                row.Inflection <- Some <| Json.serialize inflection
                 ctx.SubmitUpdatesAsync() |> ignore
                 return! (Successful.OK "") next hctx
         }
@@ -55,14 +69,14 @@ let putTermHandler lid tid =
             let! term = hctx.BindJsonAsync<Term>()
             let! wordClass =
                 query {
-                    for c in ctx.Conlang.ClassName do
-                    where (c.Name = term.wordClass)
-                    select (c)
+                    for cv in ctx.Conlang.ClassValue do
+                    where (cv.Name = term.wordClass && cv.Language = lid)
+                    select (cv)
                 } |> Seq.executeQueryAsync
             let! partOfSpeech =
                 query {
                     for p in ctx.Conlang.SpeechPart do
-                    where (p.Name = term.speechPart)
+                    where (p.Name = term.speechPart && p.Language = lid)
                     select (p)
                 } |> Seq.executeQueryAsync
             match toList wordClass, toList partOfSpeech with
@@ -77,6 +91,9 @@ let putTermHandler lid tid =
                     t.Language <- lid
                     t.Class <- Some term.wordClass
                     t.SpeechPart <- Some term.speechPart
+
+                    if term.transcription.IsSome then t.Transcription <- term.transcription
+                    if term.inflection.IsSome then t.Inflection <- map Json.serialize term.inflection
                 )
                 ctx.SubmitUpdatesAsync() |> ignore
                 return! (Successful.OK "") next hctx

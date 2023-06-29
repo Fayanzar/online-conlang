@@ -2,10 +2,21 @@ module OnlineConlang.Import.Phonotactics
 
 open FSharpPlus
 
+open OnlineConlang.DB.Context
 open OnlineConlang.Import.Phonology
 open OnlineConlang.Import.Transformations
 
-let mutable transcriptionTransformations : (Transformation list) = []
+open FSharp.Json
+open System.Collections.Generic
+
+let transcriptionTransformations = new Dictionary<int, Transformation list>()
+
+let updateTranscriptionTransformations lid =
+    let transformations = query {
+                                for r in ctx.Conlang.TranscriptionRule do
+                                where (r.Language = lid)
+                            } |> Seq.map (fun r -> Json.deserialize r.Rule) |> toList
+    transcriptionTransformations[lid] <- transformations
 
 let mutable syllable : string = ""
 

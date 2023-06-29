@@ -5,10 +5,12 @@ open FSharpPlus
 open System.Text.RegularExpressions
 
 [<StructuredFormatDisplay("{input} → {output}")>]
+[<CLIMutable>]
 type Transformation =
     {
-        input  : string
-        output : string
+        input         : string
+        output        : string
+        applyMultiple : bool
     }
 
 type TransformationWithInjection =
@@ -61,22 +63,28 @@ let rec private mkTChain' word transformations acc =
     | x::xs ->
         let wordTransformed = transformWord x word
         let newWord = snd wordTransformed
-        mkTChain' newWord xs (acc @ [fst wordTransformed])
+        if newWord = word then
+            mkTChain' word xs acc
+        else
+            if x.applyMultiple then
+                mkTChain' newWord (xs @ [x]) (acc @ [fst wordTransformed])
+            else
+                mkTChain' newWord xs (acc @ [fst wordTransformed])
     | [] -> Forward (acc, word)
 
 let mkTChain word transformations = mkTChain' word transformations []
 
 // a -> b
-let transformAToB a b = { input = a; output = b }
+let transformAToB a b = { input = a; output = b; applyMultiple = false }
 
 // ba -> '(?<=b)a' -> bc
 let transformAAfterBToC a b c =
-    { input = $"(?<={b}){a}"; output = c }
+    { input = $"(?<={b}){a}"; output = c; applyMultiple = false }
 
 // ab -> 'a(?=b)' -> cb
 let transformABeforeBToC a b c =
-    { input = $"{a}(?={b})"; output = c }
+    { input = $"{a}(?={b})"; output = c; applyMultiple = false }
 
 // bac -> '(?<=b)a(?=c)' -> bdc
 let transformABetweenBAndCToD a b c d =
-    { input = $"(?<={b}){a}(?={c})"; output = d }
+    { input = $"(?<={b}){a}(?={c})"; output = d; applyMultiple = false }

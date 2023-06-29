@@ -3,7 +3,12 @@ module OnlineConlang.Import.Morphology
 open FSharpPlus
 open OnlineConlang.Prelude
 
+open OnlineConlang.DB.Context
 open OnlineConlang.Import.Transformations
+
+open FSharp.Data.Sql
+open FSharp.Json
+open System.Collections.Generic
 
 let infixSeparator = '·'
 
@@ -42,11 +47,12 @@ type PartOfSpeech = string
 
 type Class = string
 
+type AxisValue = int
+
 type Axis =
     {
         name         : string
-        partOfSpeech : PartOfSpeech
-        inflections  : Map<string, RuleSet>
+        inflections  : Map<AxisValue, RuleSet>
     }
     with
     member this.InflectionNames = this.inflections.Keys |> toList
@@ -55,7 +61,7 @@ type Axis =
 type Axes =
     {
         axes      : Axis list
-        overrides : Map<string list, RuleSet>
+        overrides : Map<AxisValue list, RuleSet>
     }
     with
     member this.axesNumber = length this.axes
@@ -66,6 +72,66 @@ type Axes =
             let ruleSetList = List.map2 (fun name i -> Map.find name i) names inflections
             List.concat ruleSetList
         | Some ruleSet -> ruleSet
+
+let inflectTransformations = new Dictionary<int * PartOfSpeech * Class, Axes>()
+
+let buildAxis aid =
+    let axisName = query {
+                        for an in ctx.Conlang.AxisName do
+                        where (an.Id = aid)
+                        select (an.Name)
+                    } |> Seq.head
+    let axisValues = query {
+                            for av in ctx.Conlang.AxisValue do
+                            where (av.Axis = aid)
+                            select (av.Id)
+                        } |> Seq.toList
+    let axisRules = axisValues |> map (
+        fun avId ->
+            let rules = query {
+                            for r in ctx.Conlang.Rule do
+                            where (r.Axis = avId)
+                            select (r.Rule)
+                        } |> Seq.toList
+            (avId, map Json.deserialize rules)
+    )
+    ({ name = axisName; inflections = Map axisRules }, axisValues)
+
+let buildAxes (aidList : int list) =
+    let (axisList, axisIds) = (map (fst << buildAxis) aidList, map (snd << buildAxis) aidList)
+    let flattenedIds = List.concat axisIds
+    let cartIds = cartesian axisIds
+    let overrides = query {
+                        for aro in ctx.Conlang.AxesRuleOverride do
+                        where (List.contains aro.AxisValue flattenedIds)
+                        select (aro.AxisValue, aro.RuleOverride)
+                    } |> Seq.groupBy (snd) |> Seq.toList |> map (fun (oId, p) -> (oId, p |> map fst |> toList))
+    let filteredIds = overrides |> filter (fun o -> List.contains (snd o) cartIds)
+    let overrideRules = filteredIds |> map (
+        fun (rId, avIds) ->
+            let rules = query {
+                            for ro in ctx.Conlang.RuleOverride do
+                            where (ro.Id = rId)
+                            select ro.Rule
+                        } |> Seq.toList |> map Json.deserialize
+            (avIds, rules)
+    )
+    { axes = axisList; overrides = Map overrideRules }
+
+let updateInflectTransformations lid =
+    inflectTransformations.Clear()
+    let inflections = query {
+        for i in ctx.Conlang.Inflection do
+        join sp in ctx.Conlang.SpeechPart on (i.SpeechPart = sp.Name)
+        where (sp.Language = lid)
+        select (i.SpeechPart, i.Class, i.Axis)
+    }
+    let groupedInflections = inflections |> Seq.groupBy (fun i -> (fst3 i, snd3 i))
+    groupedInflections |> toList |> map (
+        fun (k, v) ->
+            let axes = v |> map thd3 |> toList |> buildAxes
+            inflectTransformations.Add((lid, fst k, snd k), axes)
+    )
 
 let rec private inflect' word rules =
     match rules with
