@@ -7,13 +7,21 @@ open OnlineConlang.DB.Context
 open OnlineConlang.Import.Transformations
 
 open FSharp.Data.Sql
-open FSharp.Json
 open System.Collections.Generic
+open System.Text.Json
+open System.Text.Json.Serialization
+
+let jsonOptions =
+    JsonFSharpOptions.Default()
+        .WithUnionExternalTag()
+        .WithUnionNamedFields()
+        .ToJsonSerializerOptions()
 
 let infixSeparator = '·'
 
 let performFusion w1 w2 t =
-    snd <| transformWord t (w1 + " " + w2)
+    let word = snd <| transformWord t (w1 + " " + w2)
+    String.collect (fun c -> if c = ' ' then "" else string c) word
 
 let addSuffix word suffix fusion = performFusion word suffix fusion
 
@@ -73,7 +81,7 @@ type Axes =
             List.concat ruleSetList
         | Some ruleSet -> ruleSet
 
-let inflectTransformations = new Dictionary<int * PartOfSpeech * Class, Axes>()
+let inflectTransformations = new Dictionary<int * PartOfSpeech * (Class Set), Axes>()
 
 let buildAxis aid =
     let axisName = query {
@@ -93,7 +101,7 @@ let buildAxis aid =
                             where (r.Axis = avId)
                             select (r.Rule)
                         } |> Seq.toList
-            (avId, map Json.deserialize rules)
+            (avId, rules |> map (fun r -> JsonSerializer.Deserialize(r, jsonOptions)))
     )
     ({ name = axisName; inflections = Map axisRules }, axisValues)
 
@@ -103,7 +111,7 @@ let buildAxes (aidList : int list) =
     let cartIds = cartesian axisIds
     let overrides = query {
                         for aro in ctx.Conlang.AxesRuleOverride do
-                        where (List.contains aro.AxisValue flattenedIds)
+                        where (aro.AxisValue |=| flattenedIds)
                         select (aro.AxisValue, aro.RuleOverride)
                     } |> Seq.groupBy (snd) |> Seq.toList |> map (fun (oId, p) -> (oId, p |> map fst |> toList))
     let filteredIds = overrides |> filter (fun o -> List.contains (snd o) cartIds)
@@ -113,7 +121,7 @@ let buildAxes (aidList : int list) =
                             for ro in ctx.Conlang.RuleOverride do
                             where (ro.Id = rId)
                             select ro.Rule
-                        } |> Seq.toList |> map Json.deserialize
+                        } |> Seq.toList |> map (fun r -> JsonSerializer.Deserialize(r, jsonOptions))
             (avIds, rules)
     )
     { axes = axisList; overrides = Map overrideRules }
@@ -123,11 +131,18 @@ let updateInflectTransformations lid =
     let inflections = query {
         for i in ctx.Conlang.Inflection do
         join sp in ctx.Conlang.SpeechPart on (i.SpeechPart = sp.Name)
+        join ic in ctx.Conlang.InflectionClass on (i.Id = ic.Inflection)
         where (sp.Language = lid)
-        select (i.SpeechPart, i.Class, i.Axis)
+        select (i.Id, i.SpeechPart, ic.Class, i.Axis)
     }
-    let groupedInflections = inflections |> Seq.groupBy (fun i -> (fst3 i, snd3 i))
-    groupedInflections |> toList |> map (
+    let groupedByClass = inflections |> Seq.groupBy fst4 |> map (
+        fun (_, v) -> ( head <| map snd4 v
+                      , map thd4 v |> Set
+                      , head <| map fth4 v
+                      )
+    )
+    let groupedInflections = groupedByClass |> Seq.groupBy (fun i -> (fst3 i, snd3 i))
+    groupedInflections |> toList |> iter (
         fun (k, v) ->
             let axes = v |> map thd3 |> toList |> buildAxes
             inflectTransformations.Add((lid, fst k, snd k), axes)

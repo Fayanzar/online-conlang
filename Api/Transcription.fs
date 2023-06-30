@@ -1,4 +1,7 @@
-module OnlineConlang.Api.transcription
+module OnlineConlang.Api.Transcription
+
+open FSharpPlus
+open OnlineConlang.Prelude
 
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Phonotactics
@@ -16,10 +19,14 @@ let postTranscriptionHandler lid =
             let row = ctx.Conlang.TranscriptionRule.Create()
             row.Language <- lid
             row.Rule <- Json.serialize rule
-            ctx.SubmitUpdatesAsync() |> ignore
-
-            updateTranscriptionTransformations lid
-            return! (Successful.OK "") next hctx
+            try
+                ctx.SubmitUpdatesAsync() |> ignore
+                updateTranscriptionTransformations lid
+                return! (Successful.OK "") next hctx
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                return! (internalServerError e.Message) next hctx
         }
 
 let putTranscriptionHandler lid tid =
@@ -32,10 +39,14 @@ let putTranscriptionHandler lid tid =
             } |> Seq.iter (fun r ->
                 r.Rule <- Json.serialize rule
             )
-            ctx.SubmitUpdatesAsync() |> ignore
-
-            updateTranscriptionTransformations lid
-            return! (Successful.OK "") next hctx
+            try
+                ctx.SubmitUpdatesAsync() |> ignore
+                updateTranscriptionTransformations lid
+                return! (Successful.OK "") next hctx
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                return! (internalServerError e.Message) next hctx
         }
 
 let deleteTranscriptionHandler lid tid =
@@ -49,3 +60,12 @@ let deleteTranscriptionHandler lid tid =
             updateTranscriptionTransformations lid
             return! (Successful.OK "") next hctx
         }
+
+let getTranscriptionsHandler lid =
+    let rules : Transformation list =
+        query {
+            for t in ctx.Conlang.TranscriptionRule do
+            where (t.Language = lid)
+            select t.Rule
+        } |> Seq.toList |> map Json.deserialize
+    json rules

@@ -1,7 +1,14 @@
 module OnlineConlang.App
 
+open OnlineConlang.Api.Class
 open OnlineConlang.Api.Language
+open OnlineConlang.Api.SpeechPart
 open OnlineConlang.Api.Term
+open OnlineConlang.Api.Transcription
+open OnlineConlang.Api.Axes
+
+open OnlineConlang.DB.Context
+open OnlineConlang.Import.Morphology
 
 open System
 open System.IO
@@ -13,6 +20,14 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
+
+open System.Text.Json.Serialization
+
+let options =
+    JsonFSharpOptions.Default()
+        .WithUnionExternalTag()
+        .WithUnionNamedFields()
+        .ToJsonSerializerOptions()
 
 // ---------------------------------
 // Models
@@ -67,15 +82,33 @@ let webApp =
             choose [
                 route "/" >=> indexHandler "world"
                 routef "/hello/%s" indexHandler
+                routef "/%i/transcriptions" getTranscriptionsHandler
+                routef "/%i/speechparts" getSpeechPartsHandler
+                routef "/%i/classes" getClassesHandler
+                route "/languages" >=> getLanguagesHandler
+                routef "/%i/axes" getAxesHandler
             ]
         POST >=>
             choose [
                 routef "/language/%s" postLanguageHandler
-                routef "/language/%d" postTermHandler
+                routef "/%i/term" postTermHandler
+                routef "/%i/classname/%s" postClassHandler
+                routef "/%i/%s/classvalue/%s" postClassValueHandler
+                routef "/%i/speechpart/%s" postSpeechPartHandler
+                routef "/%i/axisname/%s" postAxisNameHandler
+                routef "/%i/axisvalue/%s" postAxisValueHandler
+                routef "/%i/axisrule" postAxisRuleHandler
+                route "/inflection" >=> postInflectionHandler
+                routef "/%i/rebuildinflection" postRebuildInflectionsHandler
+                route "/overriderule" >=> postOverrideRuleHandler
             ]
         DELETE >=>
             choose [
-                routef "/language/%s" deleteLanguageHandler
+                routef "/language/%i" deleteLanguageHandler
+                routef "/%i/term/%i" deleteTermHandler
+                routef "/%i/classname/%s" deleteClassHandler
+                routef "/%i/%s/classvalue/%s" deleteClassValueHandler
+                routef "/%i/speechpart/%s" deleteSpeechPartHandler
             ]
         setStatusCode 404 >=> text "Not Found" ]
 
@@ -115,6 +148,7 @@ let configureApp (app : IApplicationBuilder) =
 let configureServices (services : IServiceCollection) =
     services.AddCors()    |> ignore
     services.AddGiraffe() |> ignore
+    services.AddSingleton<Json.ISerializer>(SystemTextJson.Serializer(options)) |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()
@@ -124,6 +158,13 @@ let configureLogging (builder : ILoggingBuilder) =
 let main args =
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
+    let languages = query {
+        for l in ctx.Conlang.Language do
+        select l.Id
+    }
+    for lid in (Seq.toList languages) do
+        updateInflectTransformations lid
+
     Host.CreateDefaultBuilder(args)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
