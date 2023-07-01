@@ -40,7 +40,7 @@ let deleteSpeechPartHandler (lid, spName) =
                 for sp in ctx.Conlang.SpeechPart do
                 where (sp.Language = lid && sp.Name = spName)
             } |> Seq.``delete all items from single table`` |> ignore
-            return! (Successful.OK "") next hctx
+            return! Successful.OK "" next hctx
         }
 
 let getSpeechPartsHandler lid =

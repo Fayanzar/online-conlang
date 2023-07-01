@@ -14,38 +14,32 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open System.Transactions
 
-let jsonOptions =
-    JsonFSharpOptions.Default()
-        .WithUnionExternalTag()
-        .WithUnionNamedFields()
-        .ToJsonSerializerOptions()
-
 let postTermHandler lid =
     fun (next : HttpFunc) (hctx : HttpContext) ->
         task {
             let! term = hctx.BindJsonAsync<Term>()
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-            let! wordClasses =
+            let wordClasses =
                 query {
                     for cv in ctx.Conlang.ClassValue do
                     where (cv.Language = lid)
                     select cv.Name
-                } |> Seq.executeQueryAsync
-            let! partOfSpeech =
+                }
+            let partOfSpeech =
                 query {
                     for p in ctx.Conlang.SpeechPart do
                     where (p.Name = term.speechPart && p.Language = lid)
                     select p
-                } |> Seq.executeQueryAsync
+                }
             let newWordClasses = Set.intersect (Set wordClasses) term.wordClasses
             if newWordClasses <> term.wordClasses then
                 transaction.Complete()
-                return! (badRequest400 "one of classes does not exist") next hctx
+                return! badRequest400 "one of classes does not exist" next hctx
             else
                 match toList partOfSpeech with
                 | [] ->
                     transaction.Complete()
-                    return! (badRequest400 "part of speech does not exist") next hctx
+                    return! badRequest400 "part of speech does not exist" next hctx
                 | _  ->
                     let row = ctx.Conlang.Term.Create()
                     row.Word <- term.word
@@ -76,7 +70,7 @@ let postTermHandler lid =
                         ctx.SubmitUpdates()
 
                     transaction.Complete()
-                    return! (Successful.OK "") next hctx
+                    return! Successful.OK "" next hctx
         }
 
 let deleteTermHandler (lid, tid) =
@@ -93,21 +87,26 @@ let putTermHandler lid tid =
     fun (next : HttpFunc) (hctx : HttpContext) ->
         task {
             let! term = hctx.BindJsonAsync<Term>()
-            let! wordClasses =
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            let wordClasses =
                 query {
                     for cv in ctx.Conlang.ClassValue do
                     where (Set.contains cv.Name term.wordClasses && cv.Language = lid)
                     select (cv)
-                } |> Seq.executeQueryAsync
-            let! partOfSpeech =
+                }
+            let partOfSpeech =
                 query {
                     for p in ctx.Conlang.SpeechPart do
                     where (p.Name = term.speechPart && p.Language = lid)
                     select (p)
-                } |> Seq.executeQueryAsync
+                }
             match toList wordClasses, toList partOfSpeech with
-            | [], _ -> return! (badRequest400 "class does not exist") next hctx
-            | _, [] -> return! (badRequest400 "part of speech does not exist") next hctx
+            | [], _ ->
+                transaction.Complete()
+                return! badRequest400 "class does not exist" next hctx
+            | _, [] ->
+                transaction.Complete()
+                return! badRequest400 "part of speech does not exist" next hctx
             | _, _  ->
                 query {
                     for t in ctx.Conlang.Term do
@@ -122,7 +121,7 @@ let putTermHandler lid tid =
                                                         JsonSerializer.Serialize(i, jsonOptions)
                                                     )
                 )
-                ctx.SubmitUpdatesAsync() |> ignore
+                ctx.SubmitUpdates()
 
                 query {
                     for tc in ctx.Conlang.TermClass do
@@ -134,8 +133,10 @@ let putTermHandler lid tid =
                         let rowClass = ctx.Conlang.TermClass.Create()
                         rowClass.Class <- c.Name
                         rowClass.Term <- tid
-                        ctx.SubmitUpdatesAsync() |> ignore
+                        ctx.SubmitUpdates()
                 )
+
+                transaction.Complete()
                 return! (Successful.OK "") next hctx
         }
 

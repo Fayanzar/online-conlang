@@ -13,12 +13,6 @@ open System.Transactions
 open Giraffe
 open Microsoft.AspNetCore.Http
 
-let jsonOptions =
-    JsonFSharpOptions.Default()
-        .WithUnionExternalTag()
-        .WithUnionNamedFields()
-        .ToJsonSerializerOptions()
-
 let postAxisNameHandler (lid, an) =
     let row = ctx.Conlang.AxisName.Create()
     row.Language <- lid
@@ -30,6 +24,13 @@ let postAxisNameHandler (lid, an) =
     | e ->
         ctx.ClearUpdates() |> ignore
         internalServerError e.Message
+
+let putAxisNameHandler (aid, an) =
+    query {
+        for a in ctx.Conlang.AxisName do
+        where (a.Id = aid)
+    } |> Seq.iter (fun a -> a.Name <- an)
+    Successful.OK ""
 
 let deleteAxisNameHandler anid =
     fun (next : HttpFunc) (hctx : HttpContext) ->
@@ -53,6 +54,23 @@ let postAxisValueHandler (aid, av) =
         ctx.ClearUpdates() |> ignore
         internalServerError e.Message
 
+let putAxisValueHandler (avid, av) =
+    query {
+        for a in ctx.Conlang.AxisValue do
+        where (a.Id = avid)
+    } |> Seq.iter (fun a -> a.Name <- av)
+    Successful.OK ""
+
+let deleteAxisValueHandler avid =
+    fun (next : HttpFunc) (hctx : HttpContext) ->
+        task {
+            query {
+                for a in ctx.Conlang.AxisValue do
+                where (a.Id = avid)
+            } |> Seq.``delete all items from single table`` |> ignore
+            return! Successful.OK "" next hctx
+        }
+
 let postAxisRuleHandler avid =
     fun (next : HttpFunc) (hctx : HttpContext) ->
         task {
@@ -67,6 +85,27 @@ let postAxisRuleHandler avid =
             | e ->
                 ctx.ClearUpdates() |> ignore
                 return! (internalServerError e.Message) next hctx
+        }
+
+let putAxisRuleHandler rid =
+    fun (next : HttpFunc) (hctx : HttpContext) ->
+        task {
+            let! rule = hctx.BindJsonAsync<Rule>()
+            query {
+                for r in ctx.Conlang.Rule do
+                where (r.Id = rid)
+            } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule, jsonOptions))
+            return! Successful.OK "" next hctx
+        }
+
+let deleteAxisRuleHandler rid =
+    fun (next : HttpFunc) (hctx : HttpContext) ->
+        task {
+            query {
+                for r in ctx.Conlang.Rule do
+                where (r.Id = rid)
+            } |> Seq.``delete all items from single table`` |> ignore
+            return! Successful.OK "" next hctx
         }
 
 type Inflection =
@@ -105,6 +144,16 @@ let postInflectionHandler =
             return! Successful.OK "" next hctx
         }
 
+let deleteInflectionHandler iid =
+    fun (next : HttpFunc) (hctx : HttpContext) ->
+        task {
+            query {
+                for i in ctx.Conlang.Inflection do
+                where (i.Id = iid)
+            } |> Seq.``delete all items from single table`` |> ignore
+            return! Successful.OK "" next hctx
+        }
+
 let postOverrideRuleHandler =
     fun (next : HttpFunc) (hctx : HttpContext) ->
         task {
@@ -126,6 +175,40 @@ let postOverrideRuleHandler =
             return! Successful.OK "" next hctx
         }
 
+let putOverrideRuleHandler rid =
+    fun (next : HttpFunc) (hctx : HttpContext) ->
+        task {
+            let! rule = hctx.BindJsonAsync<OverrideRule>()
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            query {
+                for oa in ctx.Conlang.AxesRuleOverride do
+                where (oa.RuleOverride = rid)
+            } |> Seq.``delete all items from single table`` |> ignore
+            query {
+                for r in ctx.Conlang.RuleOverride do
+                where (r.Id = rid)
+            } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions))
+
+            for a in rule.overrideAxes do
+                let aroRow = ctx.Conlang.AxesRuleOverride.Create()
+                aroRow.RuleOverride <- rid
+                aroRow.AxisValue <- a
+                ctx.SubmitUpdates()
+
+            transaction.Complete()
+            return! Successful.OK "" next hctx
+        }
+
+let deleteOverrideRuleHandler rid =
+    fun (next : HttpFunc) (hctx : HttpContext) ->
+        task {
+            query {
+                for r in ctx.Conlang.AxesRuleOverride do
+                where (r.Id = rid)
+            } |> Seq.``delete all items from single table`` |> ignore
+            return! Successful.OK "" next hctx
+        }
+
 type AxisForAPI =
     {
         id     : int
@@ -142,7 +225,7 @@ type InflectTForAPI =
     }
 
 let getAxesHandler lid =
-    (*let axes = query {
+    let axes = query {
         for an in ctx.Conlang.AxisName do
         join av in ctx.Conlang.AxisValue on (an.Id = av.Axis)
         where (an.Language = lid)
@@ -154,8 +237,15 @@ let getAxesHandler lid =
         let aName = snd k
         let aValues = v |> Seq.toList |> map snd
         { id = aId; name = aName; values = aValues }
-    )*)
-    let resp = inflectTransformations |> Seq.map (fun (KeyValue((l, sp, cl), a)) ->
-        { language = l; speechPart = sp; classes = cl; axes = a}
     )
+    json resp
+
+let getInflectionsHandler lid =
+    let filteredInflections = inflectTransformations |> Seq.filter
+                                (fun (KeyValue((l, _, _), _)) ->
+                                    l = lid
+                                )
+    let resp = filteredInflections |> Seq.map (fun (KeyValue((l, sp, cl), a)) ->
+            { language = l; speechPart = sp; classes = cl; axes = a}
+        )
     json (toList resp)

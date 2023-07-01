@@ -40,7 +40,7 @@ let deleteClassHandler (lid, cName) =
                 for c in ctx.Conlang.ClassName do
                 where (c.Language = lid && c.Name = cName)
             } |> Seq.``delete all items from single table`` |> ignore
-            return! (Successful.OK "") next hctx
+            return! Successful.OK "" next hctx
         }
 
 let postClassValueHandler (lid, cn, cv) =
@@ -84,7 +84,7 @@ let deleteClassValueHandler (lid, c, cValue) =
                 for cv in ctx.Conlang.ClassValue do
                 where (cv.Language = lid && cv.Name = cValue && cv.Class = c)
             } |> Seq.``delete all items from single table`` |> ignore
-            return! (Successful.OK "") next hctx
+            return! Successful.OK "" next hctx
         }
 
 let getClassesHandler lid =

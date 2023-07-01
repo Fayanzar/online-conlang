@@ -1,6 +1,7 @@
 module OnlineConlang.Prelude
 
 open Giraffe
+open System.Text.Json.Serialization
 
 type ErrorResponse =
     {
@@ -34,3 +35,9 @@ let rec cartesian lstlst =
             (List.fold (fun acc elem -> (elem::celem)::acc) [] h) @ cacc
             ) [] (cartesian t)
     | _ -> []
+
+let jsonOptions =
+    JsonFSharpOptions.Default()
+        .WithUnionExternalTag()
+        .WithUnionNamedFields()
+        .ToJsonSerializerOptions()

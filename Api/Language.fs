@@ -22,7 +22,7 @@ let deleteLanguageHandler lid =
                 for l in ctx.Conlang.Language do
                 where (l.Id = lid)
             } |> Seq.``delete all items from single table`` |> ignore
-            return! (Successful.OK "") next hctx
+            return! Successful.OK "" next hctx
         }
 
 let putLanguageHandler lid newName =
@@ -45,13 +45,13 @@ type Languages =
 let getLanguagesHandler =
     fun (next : HttpFunc) (hctx : HttpContext) ->
         task {
-            let! langs =
+            let langs =
                 query {
                     for l in ctx.Conlang.Language do
                     select (l.Id, l.Name)
-                } |> Seq.executeQueryAsync
-            let langsMap = langs |> map (
+                }
+            let langsMap = langs |> Seq.toList |> map (
                 fun (id, name) -> { id = id; name = name }
             )
-            return! (json langsMap) next hctx
+            return! json langsMap next hctx
         }
