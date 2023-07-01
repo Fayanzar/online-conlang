@@ -21,14 +21,6 @@ open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
 
-open System.Text.Json.Serialization
-
-let options =
-    JsonFSharpOptions.Default()
-        .WithUnionExternalTag()
-        .WithUnionNamedFields()
-        .ToJsonSerializerOptions()
-
 // ---------------------------------
 // Models
 // ---------------------------------
@@ -148,7 +140,7 @@ let configureApp (app : IApplicationBuilder) =
 let configureServices (services : IServiceCollection) =
     services.AddCors()    |> ignore
     services.AddGiraffe() |> ignore
-    services.AddSingleton<Json.ISerializer>(SystemTextJson.Serializer(options)) |> ignore
+    services.AddSingleton<Json.ISerializer>(SystemTextJson.Serializer(jsonOptions)) |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()

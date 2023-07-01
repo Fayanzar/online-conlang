@@ -23,8 +23,6 @@
     <Compile Include="Constants\Suprasegmentals.fs" />
     <Compile Include="Constants\Tones.fs" />
     <Compile Include="Constants\Vowels.fs" />
-    <Compile Include="Storage\Memory.fs" />
-    <Compile Include="Storage\File.fs" />
     <Compile Include="Import\Phonology.fs" />
     <Compile Include="Import\Transformations.fs" />
     <Compile Include="Import\Phonotactics.fs" />

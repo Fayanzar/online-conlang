@@ -9,7 +9,6 @@ open OnlineConlang.Import.Transformations
 
 open FSharp.Data.Sql
 open System.Text.Json
-open System.Text.Json.Serialization
 open Giraffe
 open Microsoft.AspNetCore.Http
 

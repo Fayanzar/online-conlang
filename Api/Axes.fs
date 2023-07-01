@@ -8,7 +8,6 @@ open OnlineConlang.Import.Morphology
 
 open FSharp.Data.Sql
 open System.Text.Json
-open System.Text.Json.Serialization
 open System.Transactions
 open Giraffe
 open Microsoft.AspNetCore.Http

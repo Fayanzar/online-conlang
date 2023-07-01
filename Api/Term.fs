@@ -11,7 +11,6 @@ open FSharp.Data.Sql
 open Giraffe
 open Microsoft.AspNetCore.Http
 open System.Text.Json
-open System.Text.Json.Serialization
 open System.Transactions
 
 let postTermHandler lid =
