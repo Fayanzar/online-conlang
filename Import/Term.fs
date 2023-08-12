@@ -9,14 +9,14 @@ open OnlineConlang.Import.Phonotactics
 [<CLIMutable>]
 type Term =
     {
-        word          : string
-        transcription : string Option
-        inflection    : ((int list) * string) list Option
-        speechPart    : PartOfSpeech
-        wordClasses   : Class Set
+        word              : string
+        speechPart        : PartOfSpeech
+        wordClasses       : Class Set
+        inflection        : ((int list) * string) list Option
+        transcription     : string Option
     }
     with
-    member this.syllabifiedTranscription = map syllabifyTranscription this.transcription <*> (Some syllable)
+    //member this.syllabifiedTranscription = map syllabifyTranscription this.transcription <*> (Some syllable)
     member this.syllabifiedWord lid =
         if List.contains lid (toList transcriptionTransformations.Keys) then
             SyllabifyWord this.word transcriptionTransformations[lid] syllable

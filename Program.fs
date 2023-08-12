@@ -1,5 +1,7 @@
 module OnlineConlang.App
 
+open SharedModels
+
 open OnlineConlang.Api.Class
 open OnlineConlang.Api.Language
 open OnlineConlang.Api.SpeechPart
@@ -20,6 +22,9 @@ open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open Microsoft.Extensions.DependencyInjection
 open Giraffe
+
+open Fable.Remoting.Server
+open Fable.Remoting.Giraffe
 
 // ---------------------------------
 // Models
@@ -61,48 +66,99 @@ module Views =
 // Web app
 // ---------------------------------
 
-let indexHandler (name : string) =
-    fun (next : HttpFunc) (ctx : HttpContext) ->
-        let greetings = $"Hi, {name}!"
-        let model     = { Text = greetings }
-        let view      = Views.index model
-        htmlView view next ctx
+let serverAPI : IServer = {
+    getLanguages = getLanguagesHandler
+    deleteLanguage = deleteLanguageHandler
+    postLanguage = postLanguageHandler
+    putLanguage = putLanguageHandler
 
-let webApp =
-    choose [
-        GET >=>
-            choose [
-                route "/" >=> indexHandler "world"
-                routef "/hello/%s" indexHandler
-                routef "/%i/transcriptions" getTranscriptionsHandler
-                routef "/%i/speechparts" getSpeechPartsHandler
-                routef "/%i/classes" getClassesHandler
-                route "/languages" >=> getLanguagesHandler
-                routef "/%i/axes" getAxesHandler
-            ]
-        POST >=>
-            choose [
-                routef "/language/%s" postLanguageHandler
-                routef "/%i/term" postTermHandler
-                routef "/%i/classname/%s" postClassHandler
-                routef "/%i/%s/classvalue/%s" postClassValueHandler
-                routef "/%i/speechpart/%s" postSpeechPartHandler
-                routef "/%i/axisname/%s" postAxisNameHandler
-                routef "/%i/axisvalue/%s" postAxisValueHandler
-                routef "/%i/axisrule" postAxisRuleHandler
-                route "/inflection" >=> postInflectionHandler
-                routef "/%i/rebuildinflection" postRebuildInflectionsHandler
-                route "/overriderule" >=> postOverrideRuleHandler
-            ]
-        DELETE >=>
-            choose [
-                routef "/language/%i" deleteLanguageHandler
-                routef "/%i/term/%i" deleteTermHandler
-                routef "/%i/classname/%s" deleteClassHandler
-                routef "/%i/%s/classvalue/%s" deleteClassValueHandler
-                routef "/%i/speechpart/%s" deleteSpeechPartHandler
-            ]
-        setStatusCode 404 >=> text "Not Found" ]
+    getClasses = getClassesHandler
+    postClass = postClassHandler
+    putClass = putClassHandler
+    deleteClass = deleteClassHandler
+
+    postClassValue = postClassValueHandler
+    putClassValue = putClassValueHandler
+    deleteClassValue = deleteClassValueHandler
+
+    getSpeechParts = getSpeechPartsHandler
+    postSpeechPart = postSpeechPartHandler
+    putSpeechPart = putSpeechPartHandler
+    deleteSpeechPart = deleteSpeechPartHandler
+
+    getTranscriptions = getTranscriptionsHandler
+    postTranscription = postTranscriptionHandler
+    putTranscription = putTranscriptionHandler
+    deleteTranscription = deleteTranscriptionHandler
+
+    getTerms = getTermsHandler
+    postTerm = postTermHandler
+    putTerm = putTermHandler
+    deleteTerm = deleteTermHandler
+
+    rebuildInflections = postRebuildInflectionsHandler
+
+    getAxes = getAxesHandler
+    postAxisName = postAxisNameHandler
+    putAxisName = putAxisNameHandler
+    deleteAxisName = deleteAxisNameHandler
+
+    postAxisValue = postAxisValueHandler
+    putAxisValue = putAxisValueHandler
+    deleteAxisValue = deleteAxisValueHandler
+
+    postAxisRule = postAxisRuleHandler
+    putAxisRule = putAxisRuleHandler
+    deleteAxisRule = deleteAxisRuleHandler
+
+    postOverrideRule = postOverrideRuleHandler
+    putOverrideRule = putOverrideRuleHandler
+    deleteOverrideRule = deleteOverrideRuleHandler
+
+    getInflections = getInflectionsHandler
+    postInflection = postInflectionHandler
+    deleteInflection = deleteInflectionHandler
+}
+
+let webApp : HttpHandler =
+    Remoting.createApi()
+    |> Remoting.withRouteBuilder routeBuilder
+    |> Remoting.fromValue serverAPI
+    |> Remoting.buildHttpHandler
+
+// let webApp =
+//     choose [
+//         GET >=>
+//             choose [
+//                 routef "api/%i/transcriptions" getTranscriptionsHandler
+//                 routef "api/%i/speechparts" getSpeechPartsHandler
+//                 routef "api/%i/classes" getClassesHandler
+//                 route "api/languages" >=> getLanguagesHandler
+//                 routef "api/%i/axes" getAxesHandler
+//             ]
+//         POST >=>
+//             choose [
+//                 routef "api/language/%s" postLanguageHandler
+//                 routef "api/%i/term" postTermHandler
+//                 routef "api/%i/classname/%s" postClassHandler
+//                 routef "api/%i/%s/classvalue/%s" postClassValueHandler
+//                 routef "api/%i/speechpart/%s" postSpeechPartHandler
+//                 routef "api/%i/axisname/%s" postAxisNameHandler
+//                 routef "api/%i/axisvalue/%s" postAxisValueHandler
+//                 routef "api/%i/axisrule" postAxisRuleHandler
+//                 route "api/inflection" >=> postInflectionHandler
+//                 routef "api/%i/rebuildinflection" postRebuildInflectionsHandler
+//                 route "api/overriderule" >=> postOverrideRuleHandler
+//             ]
+//         DELETE >=>
+//             choose [
+//                 routef "api/language/%i" deleteLanguageHandler
+//                 routef "api/%i/term/%i" deleteTermHandler
+//                 routef "api/%i/classname/%s" deleteClassHandler
+//                 routef "api/%i/%s/classvalue/%s" deleteClassValueHandler
+//                 routef "api/%i/speechpart/%s" deleteSpeechPartHandler
+//             ]
+//         setStatusCode 404 >=> text "Not Found" ]
 
 // ---------------------------------
 // Error handler
@@ -119,6 +175,8 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 let configureCors (builder : CorsPolicyBuilder) =
     builder
         .WithOrigins(
+            "moz-extension://812691db-0ba9-4cc4-918a-9b2169390784",
+            "http://localhost:5173",
             "http://localhost:5000",
             "https://localhost:5001")
        .AllowAnyMethod()

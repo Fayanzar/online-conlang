@@ -5,6 +5,7 @@
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Fable.Remoting.Giraffe" Version="5.14.0" />
     <PackageReference Include="FSharp.Json" Version="0.4.1" />
     <PackageReference Include="FSharp.SystemTextJson" Version="1.1.23" />
     <PackageReference Include="FSharpPlus" Version="1.4.0" />
@@ -28,6 +29,7 @@
     <Compile Include="Import\Phonotactics.fs" />
     <Compile Include="Import\Morphology.fs" />
     <Compile Include="Import\Term.fs" />
+    <Compile Include="..\online-conlang-shared\SharedModels.fs" />
     <Compile Include="Api\Class.fs" />
     <Compile Include="Api\SpeechPart.fs" />
     <Compile Include="Api\Transcription.fs" />
