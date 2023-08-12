@@ -24,12 +24,12 @@
     <Compile Include="Constants\Suprasegmentals.fs" />
     <Compile Include="Constants\Tones.fs" />
     <Compile Include="Constants\Vowels.fs" />
+    <Compile Include="..\online-conlang-shared\SharedModels.fs" />
     <Compile Include="Import\Phonology.fs" />
     <Compile Include="Import\Transformations.fs" />
     <Compile Include="Import\Phonotactics.fs" />
     <Compile Include="Import\Morphology.fs" />
     <Compile Include="Import\Term.fs" />
-    <Compile Include="..\online-conlang-shared\SharedModels.fs" />
     <Compile Include="Api\Class.fs" />
     <Compile Include="Api\SpeechPart.fs" />
     <Compile Include="Api\Transcription.fs" />

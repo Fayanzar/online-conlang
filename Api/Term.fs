@@ -3,6 +3,8 @@ module OnlineConlang.Api.Term
 open FSharpPlus
 open OnlineConlang.Prelude
 
+open SharedModels
+
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Term
 open OnlineConlang.Import.Morphology
@@ -11,8 +13,9 @@ open FSharp.Data.Sql
 open System.Text.Json
 open System.Transactions
 
-let postTermHandler lid term =
+let postTermHandler lid termApi =
     async {
+        let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let wordClasses =
             query {
@@ -75,8 +78,9 @@ let deleteTermHandler lid tid =
         } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
     }
 
-let putTermHandler lid tid term =
+let putTermHandler lid tid termApi =
     async {
+        let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let wordClasses =
             query {
@@ -140,7 +144,7 @@ let getTermsHandler lid =
             } |> Seq.executeQueryAsync |> Async.AwaitTask
         let termsResponse =
             terms |> Seq.groupBy fst |> Seq.map (fun (t, tc) ->
-                { word = t.Word
+                { TermForAPI.word = t.Word
                   inflection =
                     match t.Inflection with
                         | Some inflection -> JsonSerializer.Deserialize(inflection, jsonOptions)

@@ -2,6 +2,8 @@ module OnlineConlang.Import.Phonotactics
 
 open FSharpPlus
 
+open SharedModels
+
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Phonology
 open OnlineConlang.Import.Transformations

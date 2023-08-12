@@ -3,9 +3,10 @@ module OnlineConlang.Api.Transcription
 open FSharpPlus
 open OnlineConlang.Prelude
 
+open SharedModels
+
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Phonotactics
-open OnlineConlang.Import.Transformations
 
 open FSharp.Data.Sql
 open System.Text.Json

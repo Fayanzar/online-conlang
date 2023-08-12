@@ -3,6 +3,8 @@ module OnlineConlang.Import.Morphology
 open FSharpPlus
 open OnlineConlang.Prelude
 
+open SharedModels
+
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Transformations
 
@@ -34,52 +36,11 @@ let addInfix (word : string) infix fusion1 fusion2 pos =
     splitWord[pos + 1] <- ""
     fold (+) "" <| toList splitWord
 
-type Affix =
-    | Prefix of string * Transformation
-    | Suffix of string * Transformation
-    | Infix of string * Transformation * Transformation * int
-
 let addAffix word affix =
     match affix with
     | Prefix (p, f) -> addPrefix word p f
     | Suffix (s, f) -> addSuffix word s f
     | Infix (i, f1, f2, pos) -> addInfix word i f1 f2 pos
-
-type Rule =
-    | AffixRule of Affix
-    | TRule of Transformation
-
-type RuleSet = Rule list
-
-type PartOfSpeech = string
-
-type Class = string
-
-type AxisValue = int
-
-type Axis =
-    {
-        name         : string
-        inflections  : Map<AxisValue, RuleSet>
-    }
-    with
-    member this.InflectionNames = this.inflections.Keys |> toList
-    member this.InflectionRules = this.inflections.Values |> toList
-
-type Axes =
-    {
-        axes      : Axis list
-        overrides : Map<AxisValue list, RuleSet>
-    }
-    with
-    member this.axesNumber = length this.axes
-    member this.ruleSetByNames names =
-        match Map.tryFind names this.overrides with
-        | None ->
-            let inflections = map (fun a -> a.inflections) this.axes
-            let ruleSetList = List.map2 (fun name i -> Map.find name i) names inflections
-            List.concat ruleSetList
-        | Some ruleSet -> ruleSet
 
 let inflectTransformations = new Dictionary<int * PartOfSpeech * (Class Set), Axes>()
 

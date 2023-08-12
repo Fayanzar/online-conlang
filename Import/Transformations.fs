@@ -2,16 +2,9 @@ module OnlineConlang.Import.Transformations
 
 open FSharpPlus
 
-open System.Text.RegularExpressions
+open SharedModels
 
-[<StructuredFormatDisplay("{input} → {output}")>]
-[<CLIMutable>]
-type Transformation =
-    {
-        input         : string
-        output        : string
-        applyMultiple : bool
-    }
+open System.Text.RegularExpressions
 
 type TransformationWithInjection =
     {

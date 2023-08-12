@@ -3,6 +3,8 @@ module OnlineConlang.Import.Term
 open FSharpPlus
 open OnlineConlang.Prelude
 
+open SharedModels
+
 open OnlineConlang.Import.Morphology
 open OnlineConlang.Import.Phonotactics
 
@@ -16,7 +18,7 @@ type Term =
         transcription     : string Option
     }
     with
-    //member this.syllabifiedTranscription = map syllabifyTranscription this.transcription <*> (Some syllable)
+    member this.syllabifiedTranscription = map syllabifyTranscription this.transcription <*> (Some syllable)
     member this.syllabifiedWord lid =
         if List.contains lid (toList transcriptionTransformations.Keys) then
             SyllabifyWord this.word transcriptionTransformations[lid] syllable
@@ -33,3 +35,11 @@ type Term =
             transcribeWord this.word transcriptionTransformations[lid]
         else
             this.word
+
+let parseTerm (termApi : TermForAPI) =
+    { word = termApi.word
+      speechPart = termApi.speechPart
+      wordClasses = termApi.wordClasses
+      inflection = termApi.inflection
+      transcription = termApi.transcription
+    }
