@@ -11,9 +11,12 @@ open OnlineConlang.Api.Axes
 
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Morphology
+open OnlineConlang.Import.Phonotactics
+open OnlineConlang.Import.Phonology
 
 open System
 open System.IO
+open System.Text.Json
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
@@ -120,49 +123,17 @@ let serverAPI : IServer = {
     deleteInflection = deleteInflectionHandler
 }
 
+let fableErrorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) =
+    printfn "Error at %s on method %s" routeInfo.path routeInfo.methodName
+    let customError = { errorMsg = ex.Message }
+    Propagate customError
+
 let webApp : HttpHandler =
     Remoting.createApi()
     |> Remoting.withRouteBuilder routeBuilder
+    |> Remoting.withErrorHandler fableErrorHandler
     |> Remoting.fromValue serverAPI
     |> Remoting.buildHttpHandler
-
-// let webApp =
-//     choose [
-//         GET >=>
-//             choose [
-//                 routef "api/%i/transcriptions" getTranscriptionsHandler
-//                 routef "api/%i/speechparts" getSpeechPartsHandler
-//                 routef "api/%i/classes" getClassesHandler
-//                 route "api/languages" >=> getLanguagesHandler
-//                 routef "api/%i/axes" getAxesHandler
-//             ]
-//         POST >=>
-//             choose [
-//                 routef "api/language/%s" postLanguageHandler
-//                 routef "api/%i/term" postTermHandler
-//                 routef "api/%i/classname/%s" postClassHandler
-//                 routef "api/%i/%s/classvalue/%s" postClassValueHandler
-//                 routef "api/%i/speechpart/%s" postSpeechPartHandler
-//                 routef "api/%i/axisname/%s" postAxisNameHandler
-//                 routef "api/%i/axisvalue/%s" postAxisValueHandler
-//                 routef "api/%i/axisrule" postAxisRuleHandler
-//                 route "api/inflection" >=> postInflectionHandler
-//                 routef "api/%i/rebuildinflection" postRebuildInflectionsHandler
-//                 route "api/overriderule" >=> postOverrideRuleHandler
-//             ]
-//         DELETE >=>
-//             choose [
-//                 routef "api/language/%i" deleteLanguageHandler
-//                 routef "api/%i/term/%i" deleteTermHandler
-//                 routef "api/%i/classname/%s" deleteClassHandler
-//                 routef "api/%i/%s/classvalue/%s" deleteClassValueHandler
-//                 routef "api/%i/speechpart/%s" deleteSpeechPartHandler
-//             ]
-//         setStatusCode 404 >=> text "Not Found" ]
-
-// ---------------------------------
-// Error handler
-// ---------------------------------
 
 let errorHandler (ex : Exception) (logger : ILogger) =
     logger.LogError(ex, "An unhandled exception has occurred while executing the request.")
@@ -208,12 +179,25 @@ let configureLogging (builder : ILoggingBuilder) =
 let main args =
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
+    let phonemes = query {
+        for p in ctx.Conlang.Phoneme do
+        select p
+    }
+    if Seq.isEmpty phonemes then
+        for p in IPA.Consonants do
+            let row = ctx.Conlang.Phoneme.Create()
+            row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
+        for p in IPA.Vowels do
+            let row = ctx.Conlang.Phoneme.Create()
+            row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
+        ctx.SubmitUpdates()
     let languages = query {
         for l in ctx.Conlang.Language do
         select l.Id
     }
     for lid in (Seq.toList languages) do
         updateInflectTransformations lid
+        updatePhonemeClasses lid
 
     Host.CreateDefaultBuilder(args)
         .ConfigureWebHostDefaults(

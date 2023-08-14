@@ -8,8 +8,15 @@ open OnlineConlang.DB.Context
 open OnlineConlang.Import.Phonology
 open OnlineConlang.Import.Transformations
 
-open FSharp.Json
 open System.Collections.Generic
+open System.Text.Json
+open System.Text.Json.Serialization
+
+let jsonOptions =
+    JsonFSharpOptions.Default()
+        .WithUnionExternalTag()
+        .WithUnionNamedFields()
+        .ToJsonSerializerOptions()
 
 let transcriptionTransformations = new Dictionary<int, Transformation list>()
 
@@ -17,35 +24,31 @@ let updateTranscriptionTransformations lid =
     let transformations = query {
                                 for r in ctx.Conlang.TranscriptionRule do
                                 where (r.Language = lid)
-                            } |> Seq.map (fun r -> Json.deserialize r.Rule) |> toList
+                            } |> Seq.map (fun r -> JsonSerializer.Deserialize(r.Rule, jsonOptions)) |> toList
     transcriptionTransformations[lid] <- transformations
 
 let mutable syllable : string = ""
 
 type PhonemeClasses =
-    | Node of string * Phoneme Set * PhonemeClasses list
+    | Node of char * Phoneme Set * PhonemeClasses list
     with
     static member Root = Node
-                            ( "P"
+                            ( 'P'
                             , (map ConsonantPhoneme IPA.Consonants) ++ (map VowelPhoneme IPA.Vowels)
                             , empty
                             )
-    static member addChild pc n (k, v) =
+    static member AddChild pc n (k, v) =
         match pc with
         | Node (s, p, l) when Node (s, p, l) = n ->
-            let newKey = if s = k then k + "'"
-                                  else k
-            let child = Node (newKey, p </Set.intersect/> v, empty)
+            let child = Node (k, p </Set.intersect/> v, empty)
             Node (s, p, child :: l)
-        | Node (s, p, l) -> Node (s, p, map (fun t -> PhonemeClasses.addChild t n (k, v)) l)
-    static member addChildByKey pc s (k, v) =
+        | Node (s, p, l) -> Node (s, p, map (fun t -> PhonemeClasses.AddChild t n (k, v)) l)
+    static member AddChildByKey pc s (k, v) =
         match pc with
         | Node (s', p, l) when s' = s ->
-            let newKey = if s' = k then k + "'"
-                                   else k
-            let child = Node (newKey, p </Set.intersect/> v, empty)
+            let child = Node (k, p </Set.intersect/> v, empty)
             Node (s', p, child :: l)
-        | Node (s', p, l) -> Node (s', p, map (fun t -> PhonemeClasses.addChildByKey t s (k, v)) l)
+        | Node (s', p, l) -> Node (s', p, map (fun t -> PhonemeClasses.AddChildByKey t s (k, v)) l)
     static member Filter pc predicate =
         match pc with
         | Node (k, v, l) ->
@@ -60,7 +63,19 @@ type PhonemeClasses =
                  , filter predicate v
                  , map (flip PhonemeClasses.Filter predicate) filteredNodes
                  )
+    static member GetParentByKey pc s =
+        match pc with
+        | Node (k, v, l) ->
+            match l |> tryFind (fun (t : PhonemeClasses) -> t.getKey = s) with
+            | Some _ -> Some (Node (k, v, l))
+            | None   -> choose (fun t -> PhonemeClasses.GetParentByKey t s) l |> tryHead
+    static member ReplacePhonemesByKey pc s phonemes =
+        match pc with
+        | Node (k, v, l) ->
+            if k = s then Node (k, phonemes, l)
+                     else Node (k, v, map (fun p -> PhonemeClasses.ReplacePhonemesByKey p s phonemes) l)
 
+    member this.getParent pc = PhonemeClasses.GetParentByKey pc (this.getKey)
     member this.findNode s =
         match this with
         | Node (s', p, l) when s = s' -> Some <| Node (s', p, l)
@@ -69,11 +84,6 @@ type PhonemeClasses =
         match this with
         | Node (s', _, _) when s = s' -> st
         | Node (s, p, l) -> Node (s, p, map (fun (t : PhonemeClasses) -> t.replaceSubtree s st) l)
-    member private this.getParent' pc p' =
-        match pc with
-        | x when x = this -> Some p'
-        | Node (s, p, l) -> choose (fun t -> this.getParent' t (Node (s, p, l))) l |> tryHead
-    member this.getParent pc = this.getParent' pc (Node ("", Set.empty, empty))
     member this.getChildren =
         match this with
         | Node (_, _, l) -> l
@@ -94,27 +104,55 @@ type PhonemeClasses =
         match this with
         | Node (s, p, l) -> $""
 
-let mutable phonemeClasses =
+let phonemeClasses = new Dictionary<int, PhonemeClasses>()
+
+let rec private buildNodes pc pList phonemesAndClasses =
+    match phonemesAndClasses with
+    | [] -> pc
+    | _ ->
+        let children = phonemesAndClasses |> filter (fun (k, _) -> List.contains (snd k) pList)
+        let notChildren = phonemesAndClasses |> filter (fun (k, _) -> not <| List.contains (snd k) pList)
+        let deserializePhonemes (phonemes : string list) : Phoneme Set =
+            phonemes |> List.map (fun p -> JsonSerializer.Deserialize(p, jsonOptions)) |> Set
+        let newPc = fold (fun x ((k, p), v) ->
+            PhonemeClasses.AddChildByKey x p (k, deserializePhonemes v)) pc children
+        let newParentList = map (fst >> fst) children
+        buildNodes newPc newParentList notChildren
+
+let updatePhonemeClasses lid =
+    let phonemesAndClasses =
+        query {
+            for p in ctx.Conlang.Phoneme do
+            join pcp in ctx.Conlang.PhonemeClassPhoneme on (p.Phoneme = pcp.Phoneme)
+            join pc in ctx.Conlang.PhonemeClass on (pcp.Class = pc.Id)
+            where (pc.Language = lid)
+            select ((pc.Key, pc.Parent), p.Phoneme)
+        } |> Seq.groupBy fst |> Seq.map (fun ((cl, p), v) -> ((cl[0], p[0]), map snd v |> toList)) |> toList
+    let rootNode = PhonemeClasses.Root
+    let nodes = buildNodes rootNode ['P'] phonemesAndClasses
+    phonemeClasses[lid] <- nodes
+
+let basicPhonemeClasses =
     let root = PhonemeClasses.Root
-    let consonants = PhonemeClasses.addChildByKey
+    let consonants = PhonemeClasses.AddChildByKey
                         root
-                        "P"
-                        ("C", map ConsonantPhoneme IPA.Consonants)
-    let consonantsAndVowels = PhonemeClasses.addChildByKey
+                        'P'
+                        ('C', map ConsonantPhoneme IPA.Consonants)
+    let consonantsAndVowels = PhonemeClasses.AddChildByKey
                                 consonants
-                                "P"
-                                ("V", map VowelPhoneme IPA.Vowels)
+                                'P'
+                                ('V', map VowelPhoneme IPA.Vowels)
     consonantsAndVowels
 
 let private getPhonemeSymbols phonemeSet =
     phonemeSet |> map (fun (p : Phoneme) -> p.IPASymbol)
 
-let rec private classifyTranscriptionChars' s acc (phonemeTree : PhonemeClasses) =
+let rec private classifyTranscriptionChars' l s acc (phonemeTree : PhonemeClasses) =
     match toList s with
     | [] ->
         let onode = phonemeTree.findLowestChild
                         (fun ps -> Set.contains acc <| getPhonemeSymbols ps)
-        option (fun (Node (k, _, _)) -> k) "" onode
+        option (fun (Node (k, _, _)) -> string k) "" onode
     | x :: xs ->
         let filteredTree = PhonemeClasses.Filter
                                 phonemeTree
@@ -125,17 +163,19 @@ let rec private classifyTranscriptionChars' s acc (phonemeTree : PhonemeClasses)
                             (fun ps -> Set.contains acc <| getPhonemeSymbols ps)
             match onode with
             | None -> classifyTranscriptionChars'
+                        l
                         s
                         ""
-                        phonemeClasses
-            | Some (Node (k, _, _)) -> k + classifyTranscriptionChars'
+                        phonemeClasses[l]
+            | Some (Node (k, _, _)) -> string k + classifyTranscriptionChars'
+                                            l
                                             s
                                             ""
-                                            phonemeClasses
-        | _ -> classifyTranscriptionChars' (string xs) (acc + string x) filteredTree
+                                            phonemeClasses[l]
+        | _ -> classifyTranscriptionChars' l (string xs) (acc + string x) filteredTree
 
-let classifyTranscriptionChars s =
-    classifyTranscriptionChars' s "" phonemeClasses
+let classifyTranscriptionChars l s =
+    classifyTranscriptionChars' l s "" phonemeClasses[l]
 
 let rec private getSubLists l =
     [ yield l
@@ -151,22 +191,29 @@ let rec private cartesian (p1 : string list) p2 =
     | [], _ -> []
     | x::xs, _ -> (map (fun y -> x + y) p2) @ (cartesian xs p2)
 
+let rec getAllClasses l c =
+    c :: match PhonemeClasses.GetParentByKey phonemeClasses[l] c with
+            | None -> []
+            | Some (Node (k, _, _)) -> k :: getAllClasses l k
 
-let syllableVariations (syllableBase : string) =
+let rec variateClasses l s =
+    s |> toList |> map (getAllClasses l >> map string) |> fold cartesian [""]
+
+let syllableVariations l (syllableBase : string) =
     let splitSyllable = syllableBase.Split 'V' |> toList
-    let part1 = head splitSyllable |> getSubLists |> map (fun s -> s + "V")
-    let part2 = fold (+) "" splitSyllable.Tail |> getSubLists
+    let part1 = head splitSyllable |> getSubLists |> distinct |> map (fun s -> s + "V") |> List.collect (variateClasses l)
+    let part2 = fold (+) "" splitSyllable.Tail |> getSubLists |> distinct |> List.collect (variateClasses l)
     cartesian part1 part2 |> sortBy length |> List.rev
 
-let rec private syllabify' (s : string) syllable (vars : string list) acc =
+let rec private syllabify' l (s : string) syllable (vars : string list) acc =
     match s, vars with
     | "", _    -> Some acc
     | _, x::xs ->
-        if s.StartsWith x then syllabify' (s.Substring <| length x) syllable (syllableVariations syllable) (x::acc)
-                          else syllabify' s syllable xs acc
+        if s.StartsWith x then syllabify' l (s.Substring <| length x) syllable (syllableVariations l syllable) (x::acc)
+                          else syllabify' l s syllable xs acc
     | _, []    -> None
 
-let syllabify s syllable = syllabify' s syllable (syllableVariations syllable) []
+let syllabify l s syllable = syllabify' l s syllable (syllableVariations l syllable) []
 
 let rec private insertDots s syllableLengths k =
     match toList s, syllableLengths with
@@ -186,9 +233,9 @@ let rec private moveDots (t : char list) inj (word : char list) (k : int) acc =
         | n -> moveDots t xs word (k + n) (acc @ sub2 @ List.replicate n '.')
     | _ -> acc
 
-let syllabifyTranscription t syllable =
-    let tClassified = classifyTranscriptionChars t
-    match syllabify tClassified syllable with
+let syllabifyTranscription l t syllable =
+    let tClassified = classifyTranscriptionChars l t
+    match syllabify l tClassified syllable with
     | None -> t
     | Some tSyllabified ->
         let syllableLengths = map length tSyllabified
@@ -208,11 +255,11 @@ let rec private contractChain chain =
             contractChain <| Reverse (newWord, xs)
     | _ -> ""
 
-let SyllabifyWord word transformations syllable =
+let SyllabifyWord l word transformations syllable =
     let tChain = mkTChain word transformations
     match tChain with
     | Forward (chain, t) ->
-        let sTranscription = syllabifyTranscription t syllable
+        let sTranscription = syllabifyTranscription l t syllable
         let newChain = rev <| map (fun (x, y) -> (y, x)) chain
         let revTChain = Reverse (sTranscription, newChain)
         contractChain revTChain

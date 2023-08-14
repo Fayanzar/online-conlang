@@ -18,10 +18,10 @@ type Term =
         transcription     : string Option
     }
     with
-    member this.syllabifiedTranscription = map syllabifyTranscription this.transcription <*> (Some syllable)
+    member this.syllabifiedTranscription lid = map (syllabifyTranscription lid) this.transcription <*> (Some syllable)
     member this.syllabifiedWord lid =
         if List.contains lid (toList transcriptionTransformations.Keys) then
-            SyllabifyWord this.word transcriptionTransformations[lid] syllable
+            SyllabifyWord lid this.word transcriptionTransformations[lid] syllable
         else this.word
     member this.mkInflections lid =
         if List.contains (lid, this.speechPart, this.wordClasses) (toList inflectTransformations.Keys) then
