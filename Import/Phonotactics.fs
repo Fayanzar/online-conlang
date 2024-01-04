@@ -74,6 +74,16 @@ type PhonemeClasses =
         | Node (k, v, l) ->
             if k = s then Node (k, phonemes, l)
                      else Node (k, v, map (fun p -> PhonemeClasses.ReplacePhonemesByKey p s phonemes) l)
+    static member ReplaceKey pc s newS =
+        match pc with
+        | Node (k, v, l) ->
+            if k = s then Node (newS, v, l)
+                     else Node (k, v, map (fun p -> PhonemeClasses.ReplaceKey p s newS) l)
+    static member DeleteByKeys pc keys =
+        match pc with
+        | Node (k, v, l) ->
+            let children = filter (fun (Node (k', _, _)) -> not <| List.contains k' keys) l
+            Node (k, v, map (fun p -> PhonemeClasses.DeleteByKeys p keys) children)
 
     member this.getParent pc = PhonemeClasses.GetParentByKey pc (this.getKey)
     member this.findNode s =

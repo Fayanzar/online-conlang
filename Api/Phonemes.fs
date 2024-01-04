@@ -50,6 +50,7 @@ let putPhonemeClassHandler lid (cl : char) (newCl : char) =
         } |> Seq.iter (fun p -> p.Key <- string newCl)
         try
             ctx.SubmitUpdates()
+            phonemeClasses[lid] <- PhonemeClasses.ReplaceKey phonemeClasses[lid] cl newCl
         with
         | e ->
             ctx.ClearUpdates() |> ignore
@@ -74,25 +75,52 @@ let deletePhonemeClassHandler lid (cl : char) =
             for p in ctx.Conlang.PhonemeClass do
             where (List.contains p.Key classes)
         } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        phonemeClasses[lid] <- PhonemeClasses.DeleteByKeys phonemeClasses[lid] <| map (fun s -> head s) classes
     }
 
-let postPhonemesPhonemeClass lid (cl : char) (phonemes : Phoneme Set) =
+let rec private updateChildPhonemes cl pc (phonemes : Phoneme Set) =
+    match pc with
+    | Node (k, v, l) ->
+        let phonemesSerialized = map (fun p -> JsonSerializer.Serialize(p, jsonOptions)) phonemes
+        query {
+            for p in ctx.Conlang.PhonemeClassPhoneme do
+            where (p.Class = cl && (not <| Set.contains p.Phoneme phonemesSerialized))
+        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> Async.RunSynchronously |> ignore
+        Node (k, v </Set.intersect/> phonemes, map (fun p -> updateChildPhonemes cl p phonemes) l)
+
+let putPhonemesPhonemeClass lid (cl : char) (phonemes : Phoneme Set) =
     async {
         let classes = query {
                             for p in ctx.Conlang.PhonemeClass do
                             where (p.Key = string cl && p.Language = lid)
-                            select (p.Id)
+                            select p.Id
                         } |> Seq.toList
         match classes with
         | [] -> failwith "no such class"
         | [classId] ->
-            for p in phonemes do
+            let oparent = PhonemeClasses.GetParentByKey phonemeClasses[lid] cl
+            let allowedPhonemes =
+                match oparent with
+                | None -> phonemes
+                | Some (Node (_, v, _)) -> phonemes </Set.intersect/> v
+            query {
+                for p in ctx.Conlang.PhonemeClassPhoneme do
+                where (p.Class = classId)
+                select p.Phoneme
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+            for p in allowedPhonemes do
                 let row = ctx.Conlang.PhonemeClassPhoneme.Create()
                 row.Class <- classId
                 row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
             try
                 ctx.SubmitUpdates()
-                phonemeClasses[lid] <- PhonemeClasses.ReplacePhonemesByKey phonemeClasses[lid] cl phonemes
+                phonemeClasses[lid] <- PhonemeClasses.ReplacePhonemesByKey phonemeClasses[lid] cl allowedPhonemes
+                let onode = phonemeClasses[lid].findNode cl
+                match onode with
+                | None -> ()
+                | Some node ->
+                    let updatedSubtree = updateChildPhonemes classId node allowedPhonemes
+                    phonemeClasses[lid] <- phonemeClasses[lid].replaceSubtree cl updatedSubtree
             with
                 | e ->
                     ctx.ClearUpdates() |> ignore
