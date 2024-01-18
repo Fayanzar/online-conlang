@@ -8,6 +8,7 @@ open OnlineConlang.Api.SpeechPart
 open OnlineConlang.Api.Term
 open OnlineConlang.Api.Transcription
 open OnlineConlang.Api.Axes
+open OnlineConlang.Api.Phonemes
 
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Morphology
@@ -110,10 +111,12 @@ let serverAPI : IServer = {
     putAxisValue = putAxisValueHandler
     deleteAxisValue = deleteAxisValueHandler
 
+    getAxisRules = getAxisRulesHandler
     postAxisRule = postAxisRuleHandler
     putAxisRule = putAxisRuleHandler
     deleteAxisRule = deleteAxisRuleHandler
 
+    getOverrideRules = getOverrideRulesHandler
     postOverrideRule = postOverrideRuleHandler
     putOverrideRule = putOverrideRuleHandler
     deleteOverrideRule = deleteOverrideRuleHandler
@@ -121,6 +124,10 @@ let serverAPI : IServer = {
     getInflections = getInflectionsHandler
     postInflection = postInflectionHandler
     deleteInflection = deleteInflectionHandler
+
+    postPhonemeClass = postPhonemeClassHandler
+    putPhonemeClass = putPhonemeClassHandler
+    deletePhonemeClass = deletePhonemeClassHandler
 }
 
 let fableErrorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) =

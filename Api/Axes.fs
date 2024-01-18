@@ -69,6 +69,17 @@ let deleteAxisValueHandler avid =
         } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
     }
 
+let getAxisRulesHandler avid : Map<int, Rule> Async =
+    async {
+        let rules =
+            query {
+                for r in ctx.Conlang.Rule do
+                where (r.Axis = avid)
+                select (r.Id, r.Rule)
+            } |> Seq.map (fun (k, r) -> (k, JsonSerializer.Deserialize(r, jsonOptions))) |> Map.ofSeq
+        return rules
+    }
+
 let postAxisRuleHandler avid (rule : Rule) =
     async {
         let row = ctx.Conlang.Rule.Create()
@@ -124,6 +135,24 @@ let deleteInflectionHandler iid =
             for i in ctx.Conlang.Inflection do
             where (i.Id = iid)
         } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+    }
+
+let getOverrideRulesHandler lid =
+    async {
+        let rules =
+            query {
+                    for ro in ctx.Conlang.RuleOverride do
+                    join aro in ctx.Conlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
+                    join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
+                    join an in ctx.Conlang.AxisName on (av.Axis = an.Id)
+                    where (an.Language = lid)
+                    select (ro.Rule, av.Id)
+            } |> Seq.toList
+        let groupedRules = rules |> List.groupBy fst |> map (fun (r, l) ->
+            { overrideRule = JsonSerializer.Deserialize(r, jsonOptions);
+              overrideAxes = map snd l
+            })
+        return groupedRules
     }
 
 let postOverrideRuleHandler rule =
