@@ -70,7 +70,7 @@ module Views =
 // Web app
 // ---------------------------------
 
-let serverAPI : IServer = {
+let server (logger : ILogger) : IServer = {
     getLanguages = getLanguagesHandler
     deleteLanguage = deleteLanguageHandler
     postLanguage = postLanguageHandler
@@ -113,7 +113,7 @@ let serverAPI : IServer = {
 
     getAxisRules = getAxisRulesHandler
     postAxisRule = postAxisRuleHandler
-    putAxisRule = putAxisRuleHandler
+    putAxisRule = putAxisRuleHandler logger
     deleteAxisRule = deleteAxisRuleHandler
 
     getOverrideRules = getOverrideRulesHandler
@@ -130,6 +130,10 @@ let serverAPI : IServer = {
     deletePhonemeClass = deletePhonemeClassHandler
 }
 
+let serverAPI (ctx: HttpContext) : IServer =
+    let logger = ctx.GetLogger("CLG")
+    server logger
+
 let fableErrorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) =
     printfn "Error at %s on method %s" routeInfo.path routeInfo.methodName
     let customError = { errorMsg = ex.Message }
@@ -139,7 +143,7 @@ let webApp : HttpHandler =
     Remoting.createApi()
     |> Remoting.withRouteBuilder routeBuilder
     |> Remoting.withErrorHandler fableErrorHandler
-    |> Remoting.fromValue serverAPI
+    |> Remoting.fromContext serverAPI
     |> Remoting.buildHttpHandler
 
 let errorHandler (ex : Exception) (logger : ILogger) =

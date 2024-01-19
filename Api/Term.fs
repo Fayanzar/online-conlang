@@ -145,6 +145,7 @@ let getTermsHandler lid =
         let termsResponse =
             terms |> Seq.groupBy fst |> Seq.map (fun (t, tc) ->
                 { TermForAPI.word = t.Word
+                  TermForAPI.id = t.Id
                   inflection =
                     match t.Inflection with
                         | Some inflection -> JsonSerializer.Deserialize(inflection, jsonOptions)

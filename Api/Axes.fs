@@ -8,6 +8,7 @@ open OnlineConlang.DB.Context
 open OnlineConlang.Import.Morphology
 
 open FSharp.Data.Sql
+open Microsoft.Extensions.Logging
 open System.Text.Json
 open System.Transactions
 
@@ -82,23 +83,49 @@ let getAxisRulesHandler avid : Map<int, Rule> Async =
 
 let postAxisRuleHandler avid (rule : Rule) =
     async {
+        printfn $"rule: {rule}"
+        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let row = ctx.Conlang.Rule.Create()
         row.Axis <- avid
         row.Rule <- JsonSerializer.Serialize(rule, jsonOptions)
+        try
+            ctx.SubmitUpdates()
+            let lid = query {
+                for a in ctx.Conlang.AxisName do
+                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                where (av.Id = avid)
+                select a.Language
+            }
+            lid |> Seq.head |> updateInflectTransformations
+        with
+        | e ->
+            ctx.ClearUpdates() |> ignore
+            failwith e.Message
+        transaction.Complete()
+    }
+
+let putAxisRuleHandler (_ : ILogger) rid (rule : Rule) =
+    async {
+        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+        query {
+            for r in ctx.Conlang.Rule do
+            where (r.Id = rid)
+        } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule, jsonOptions))
         try
             ctx.SubmitUpdates()
         with
         | e ->
             ctx.ClearUpdates() |> ignore
             failwith e.Message
-    }
-
-let putAxisRuleHandler rid (rule : Rule) =
-    async {
-        query {
-            for r in ctx.Conlang.Rule do
+        let lid = query {
+            for a in ctx.Conlang.AxisName do
+            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+            join r in ctx.Conlang.Rule on (av.Id = r.Axis)
             where (r.Id = rid)
-        } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule, jsonOptions))
+            select a.Language
+        }
+        lid |> Seq.head |> updateInflectTransformations
+        transaction.Complete()
     }
 
 let deleteAxisRuleHandler rid =
