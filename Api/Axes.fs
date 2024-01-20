@@ -31,6 +31,12 @@ let putAxisNameHandler aid an =
             for a in ctx.Conlang.AxisName do
             where (a.Id = aid)
         } |> Seq.iter (fun a -> a.Name <- an)
+        try
+            ctx.SubmitUpdates()
+        with
+        | e ->
+            ctx.ClearUpdates() |> ignore
+            failwith e.Message
     }
 
 let deleteAxisNameHandler anid =
@@ -60,6 +66,12 @@ let putAxisValueHandler avid av =
             for a in ctx.Conlang.AxisValue do
             where (a.Id = avid)
         } |> Seq.iter (fun a -> a.Name <- av)
+        try
+            ctx.SubmitUpdates()
+        with
+        | e ->
+            ctx.ClearUpdates() |> ignore
+            failwith e.Message
     }
 
 let deleteAxisValueHandler avid =
@@ -211,6 +223,7 @@ let putOverrideRuleHandler rid rule =
             for r in ctx.Conlang.RuleOverride do
             where (r.Id = rid)
         } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions))
+        ctx.SubmitUpdates()
 
         for a in rule.overrideAxes do
             let aroRow = ctx.Conlang.AxesRuleOverride.Create()
