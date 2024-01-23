@@ -69,13 +69,13 @@ let buildAxis aid =
 let buildAxes (aidList : int list) =
     let (axisList, axisIds) = (map (fst << buildAxis) aidList, map (snd << buildAxis) aidList)
     let flattenedIds = List.concat axisIds
-    let cartIds = cartesian axisIds
+    let cartIds = cartesian axisIds |> List.map Set
     let overrides = query {
                         for aro in ctx.Conlang.AxesRuleOverride do
                         where (aro.AxisValue |=| flattenedIds)
                         select (aro.AxisValue, aro.RuleOverride)
                     } |> Seq.groupBy (snd) |> Seq.toList |> map (fun (oId, p) -> (oId, p |> map fst |> toList))
-    let filteredIds = overrides |> filter (fun o -> List.contains (snd o) cartIds)
+    let filteredIds = overrides |> filter (fun o -> List.contains (Set <| snd o) cartIds)
     let overrideRules = filteredIds |> map (
         fun (rId, avIds) ->
             let rules = query {
@@ -85,7 +85,7 @@ let buildAxes (aidList : int list) =
                         } |> Seq.toList |> map (fun r -> JsonSerializer.Deserialize(r, jsonOptions))
             (avIds, rules)
     )
-    { axes = axisList; overrides = Map overrideRules }
+    { axes = axisList; overrides = overrideRules }
 
 let updateInflectTransformations lid =
     inflectTransformations.Clear()

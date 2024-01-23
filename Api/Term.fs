@@ -17,18 +17,18 @@ let postTermHandler lid termApi =
     async {
         let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let wordClasses =
+        let! wordClasses =
             query {
                 for cv in ctx.Conlang.ClassValue do
                 where (cv.Language = lid)
                 select cv.Name
-            }
-        let partOfSpeech =
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        let! partOfSpeech =
             query {
                 for p in ctx.Conlang.SpeechPart do
                 where (p.Name = term.speechPart && p.Language = lid)
                 select p
-            }
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
         let newWordClasses = Set.intersect (Set wordClasses) term.wordClasses
         if newWordClasses <> term.wordClasses then
             transaction.Complete()
@@ -72,28 +72,30 @@ let postTermHandler lid termApi =
 
 let deleteTermHandler lid tid =
     async {
-        query {
-            for t in ctx.Conlang.Term do
-            where (t.Id = tid && t.Language = lid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for t in ctx.Conlang.Term do
+                where (t.Id = tid && t.Language = lid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
     }
 
 let putTermHandler lid tid termApi =
     async {
         let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let wordClasses =
+        let! wordClasses =
             query {
                 for cv in ctx.Conlang.ClassValue do
                 where (Set.contains cv.Name term.wordClasses && cv.Language = lid)
                 select (cv)
-            }
-        let partOfSpeech =
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        let! partOfSpeech =
             query {
                 for p in ctx.Conlang.SpeechPart do
                 where (p.Name = term.speechPart && p.Language = lid)
                 select (p)
-            }
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
         match toList wordClasses, toList partOfSpeech with
         | [], _ ->
             transaction.Complete()
@@ -117,10 +119,12 @@ let putTermHandler lid tid termApi =
             )
             ctx.SubmitUpdates()
 
-            query {
-                for tc in ctx.Conlang.TermClass do
-                where (tc.Term = tid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+            do!
+                query {
+                    for tc in ctx.Conlang.TermClass do
+                    where (tc.Term = tid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
 
             wordClasses |> Seq.iter (
                 fun c ->
@@ -160,12 +164,13 @@ let getTermsHandler lid =
 
 let postRebuildInflectionsHandler tid =
     async {
-        let termWithClasses = query {
-                        for t in ctx.Conlang.Term do
-                        join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
-                        where (t.Id = tid)
-                        select (t, tc.Class)
-        }
+        let! termWithClasses =
+            query {
+                            for t in ctx.Conlang.Term do
+                            join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
+                            where (t.Id = tid)
+                            select (t, tc.Class)
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
         let term = termWithClasses |> Seq.head |> fst
         let classes = termWithClasses |> Seq.toList |> map snd |> Set
         query {
@@ -176,7 +181,7 @@ let postRebuildInflectionsHandler tid =
             | Some speechPart ->
                 let axes = inflectTransformations[(term.Language, speechPart, classes)]
                 let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
-                let inflection = map (fun names -> (names, inflect term.Word axes names)) allNames
+                let inflection = map (fun names -> (names, inflect term.Word axes (Set names))) allNames
                 t.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
             | _ -> ()
         )

@@ -34,10 +34,12 @@ let putClassHandler lid oldC newC =
     }
 let deleteClassHandler lid cName =
     async {
-        query {
-            for c in ctx.Conlang.ClassName do
-            where (c.Language = lid && c.Name = cName)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for c in ctx.Conlang.ClassName do
+                where (c.Language = lid && c.Name = cName)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
     }
 
 let postClassValueHandler lid cn cv =
@@ -78,10 +80,12 @@ let putClassValueHandler lid c oldCv newCv =
 
 let deleteClassValueHandler lid c cValue =
     async {
-        query {
-            for cv in ctx.Conlang.ClassValue do
-            where (cv.Language = lid && cv.Name = cValue && cv.Class = c)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for cv in ctx.Conlang.ClassValue do
+                where (cv.Language = lid && cv.Name = cValue && cv.Class = c)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
     }
 
 let getClassesHandler lid =

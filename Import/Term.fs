@@ -27,7 +27,7 @@ type Term =
         if List.contains (lid, this.speechPart, this.wordClasses) (toList inflectTransformations.Keys) then
             let axes = inflectTransformations[(lid, this.speechPart, this.wordClasses)]
             let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
-            map (fun names -> (names, inflect this.word axes names)) allNames
+            map (fun names -> (names, inflect this.word axes (Set names))) allNames
         else
             []
     member this.mkTranscription lid =

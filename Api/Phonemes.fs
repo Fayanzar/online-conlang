@@ -71,10 +71,12 @@ let rec getClassesForDeletion lid (parents : string list) =
 let deletePhonemeClassHandler lid (cl : char) =
     async {
         let classes = getClassesForDeletion lid [string cl]
-        query {
-            for p in ctx.Conlang.PhonemeClass do
-            where (List.contains p.Key classes)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for p in ctx.Conlang.PhonemeClass do
+                where (List.contains p.Key classes)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
         phonemeClasses[lid] <- PhonemeClasses.DeleteByKeys phonemeClasses[lid] <| map (fun s -> head s) classes
     }
 
@@ -103,11 +105,13 @@ let putPhonemesPhonemeClass lid (cl : char) (phonemes : Phoneme Set) =
                 match oparent with
                 | None -> phonemes
                 | Some (Node (_, v, _)) -> phonemes </Set.intersect/> v
-            query {
-                for p in ctx.Conlang.PhonemeClassPhoneme do
-                where (p.Class = classId)
-                select p.Phoneme
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+            do!
+                query {
+                    for p in ctx.Conlang.PhonemeClassPhoneme do
+                    where (p.Class = classId)
+                    select p.Phoneme
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
             for p in allowedPhonemes do
                 let row = ctx.Conlang.PhonemeClassPhoneme.Create()
                 row.Class <- classId

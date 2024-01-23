@@ -22,10 +22,12 @@ let postLanguageHandler language =
 
 let deleteLanguageHandler lid =
     async {
-        query {
-            for l in ctx.Conlang.Language do
-            where (l.Id = lid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for l in ctx.Conlang.Language do
+                where (l.Id = lid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
     }
 
 let putLanguageHandler lid newName =
@@ -44,11 +46,11 @@ let putLanguageHandler lid newName =
 
 let getLanguagesHandler =
     async {
-        let langs =
+        let! langs =
             query {
                 for l in ctx.Conlang.Language do
                 select (l.Id, l.Name)
-            }
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
         let langsMap = langs |> Seq.toList |> map (
             fun (id, name) -> { id = id; name = name }
         )

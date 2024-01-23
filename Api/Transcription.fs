@@ -1,7 +1,6 @@
 module OnlineConlang.Api.Transcription
 
 open FSharpPlus
-open OnlineConlang.Prelude
 
 open SharedModels
 
@@ -44,11 +43,12 @@ let putTranscriptionHandler lid tid (rule : Transformation) =
 
 let deleteTranscriptionHandler lid tid =
     async {
-        query {
-            for r in ctx.Conlang.TranscriptionRule do
-            where (r.Id = tid && r.Language = lid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
-
+        do!
+            query {
+                for r in ctx.Conlang.TranscriptionRule do
+                where (r.Id = tid && r.Language = lid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
         updateTranscriptionTransformations lid
     }
 

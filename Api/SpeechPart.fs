@@ -1,5 +1,7 @@
 module OnlineConlang.Api.SpeechPart
 
+open FSharpPlus
+
 open OnlineConlang.DB.Context
 
 open FSharp.Data.Sql
@@ -33,10 +35,12 @@ let putSpeechPartHandler lid oldSp newSp =
 
 let deleteSpeechPartHandler lid spName =
     async {
-        query {
-            for sp in ctx.Conlang.SpeechPart do
-            where (sp.Language = lid && sp.Name = spName)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for sp in ctx.Conlang.SpeechPart do
+                where (sp.Language = lid && sp.Name = spName)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
     }
 
 let getSpeechPartsHandler lid =

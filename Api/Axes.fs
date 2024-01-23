@@ -4,6 +4,8 @@ open FSharpPlus
 
 open SharedModels
 
+open OnlineConlang.Prelude
+
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Morphology
 
@@ -33,18 +35,33 @@ let putAxisNameHandler aid an =
         } |> Seq.iter (fun a -> a.Name <- an)
         try
             ctx.SubmitUpdates()
+            let lid = query {
+                    for a in ctx.Conlang.AxisName do
+                    where (a.Id = aid)
+                    select a.Language
+            }
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         with
         | e ->
             ctx.ClearUpdates() |> ignore
             failwith e.Message
     }
 
-let deleteAxisNameHandler anid =
+let deleteAxisNameHandler aid =
     async {
-        query {
-            for an in ctx.Conlang.AxisName do
-            where (an.Id = anid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        let! lid =
+            query {
+                for a in ctx.Conlang.AxisName do
+                where (a.Id = aid)
+                select a.Language
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        do!
+            query {
+                for an in ctx.Conlang.AxisName do
+                where (an.Id = aid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
 let postAxisValueHandler aid av =
@@ -54,6 +71,12 @@ let postAxisValueHandler aid av =
         row.Name <- av
         try
             ctx.SubmitUpdates()
+            let lid = query {
+                for a in ctx.Conlang.AxisName do
+                where (a.Id = aid)
+                select a.Language
+            }
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         with
         | e ->
             ctx.ClearUpdates() |> ignore
@@ -68,6 +91,13 @@ let putAxisValueHandler avid av =
         } |> Seq.iter (fun a -> a.Name <- av)
         try
             ctx.SubmitUpdates()
+            let lid = query {
+                for av in ctx.Conlang.AxisValue do
+                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                where (av.Id = avid)
+                select a.Language
+            }
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         with
         | e ->
             ctx.ClearUpdates() |> ignore
@@ -76,10 +106,20 @@ let putAxisValueHandler avid av =
 
 let deleteAxisValueHandler avid =
     async {
-        query {
-            for a in ctx.Conlang.AxisValue do
-            where (a.Id = avid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        let! lid =
+            query {
+                for av in ctx.Conlang.AxisValue do
+                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                where (av.Id = avid)
+                select a.Language
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        do!
+            query {
+                for a in ctx.Conlang.AxisValue do
+                where (a.Id = avid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
 let getAxisRulesHandler avid : Map<int, Rule> Async =
@@ -108,7 +148,7 @@ let postAxisRuleHandler avid (rule : Rule) =
                 where (av.Id = avid)
                 select a.Language
             }
-            lid |> Seq.head |> updateInflectTransformations
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         with
         | e ->
             ctx.ClearUpdates() |> ignore
@@ -136,16 +176,27 @@ let putAxisRuleHandler (_ : ILogger) rid (rule : Rule) =
             where (r.Id = rid)
             select a.Language
         }
-        lid |> Seq.head |> updateInflectTransformations
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         transaction.Complete()
     }
 
 let deleteAxisRuleHandler rid =
     async {
-        query {
-            for r in ctx.Conlang.Rule do
-            where (r.Id = rid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        let! lid =
+            query {
+                for a in ctx.Conlang.AxisName do
+                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                join r in ctx.Conlang.Rule on (av.Id = r.Axis)
+                where (r.Id = rid)
+                select a.Language
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        do!
+            query {
+                for r in ctx.Conlang.Rule do
+                where (r.Id = rid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
 let postInflectionHandler inflection =
@@ -165,15 +216,34 @@ let postInflectionHandler inflection =
                 classRow.Inflection <- iId.Id
                 ctx.SubmitUpdates()
 
+        match inflection.inflectionAxes with
+        | [] -> ()
+        | aid::_ ->
+            let lid = query {
+                for a in ctx.Conlang.AxisName do
+                where (a.Id = aid)
+                select a.Language
+            }
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+
         transaction.Complete()
     }
 
 let deleteInflectionHandler iid =
     async {
-        query {
-            for i in ctx.Conlang.Inflection do
-            where (i.Id = iid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        let! lid =
+            query {
+                for i in ctx.Conlang.Inflection do
+                join a in ctx.Conlang.AxisName on (i.Axis = a.Id)
+                select a.Language
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        do!
+            query {
+                for i in ctx.Conlang.Inflection do
+                where (i.Id = iid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
 let getOverrideRulesHandler lid =
@@ -185,13 +255,16 @@ let getOverrideRulesHandler lid =
                     join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
                     join an in ctx.Conlang.AxisName on (av.Axis = an.Id)
                     where (an.Language = lid)
-                    select (ro.Rule, av.Id)
+                    select (ro.Id, ro.Rule, av.Id)
             } |> Seq.toList
-        let groupedRules = rules |> List.groupBy fst |> map (fun (r, l) ->
-            { overrideRule = JsonSerializer.Deserialize(r, jsonOptions);
-              overrideAxes = map snd l
-            })
-        return groupedRules
+        let groupedRules = rules |> List.groupBy (fun (rid, r, _) -> (rid, r))
+                                 |> map (fun ((rid, r), l) ->
+            let oRule =
+                { overrideRule = JsonSerializer.Deserialize(r, jsonOptions);
+                overrideAxes = map thd3 l
+                }
+            (rid, oRule))
+        return groupedRules |> Map.ofList
     }
 
 let postOverrideRuleHandler rule =
@@ -209,16 +282,26 @@ let postOverrideRuleHandler rule =
             aroRow.AxisValue <- a
             ctx.SubmitUpdates()
 
+        let avid = List.head rule.overrideAxes
+        let lid = query {
+            for a in ctx.Conlang.AxisName do
+            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+            where (av.Id = avid)
+            select a.Language
+        }
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         transaction.Complete()
     }
 
-let putOverrideRuleHandler rid rule =
+let putOverrideRuleHandler (logger : ILogger) rid rule =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        query {
-            for oa in ctx.Conlang.AxesRuleOverride do
-            where (oa.RuleOverride = rid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        do!
+            query {
+                for oa in ctx.Conlang.AxesRuleOverride do
+                where (oa.RuleOverride = rid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
         query {
             for r in ctx.Conlang.RuleOverride do
             where (r.Id = rid)
@@ -231,15 +314,36 @@ let putOverrideRuleHandler rid rule =
             aroRow.AxisValue <- a
             ctx.SubmitUpdates()
 
+        match List.tryHead rule.overrideAxes with
+        | None -> ()
+        | Some avid ->
+            let lid = query {
+                for a in ctx.Conlang.AxisName do
+                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                where (av.Id = avid)
+                select a.Language
+            }
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
         transaction.Complete()
     }
 
-let deleteOverrideRuleHandler rid =
+let deleteOverrideRuleHandler (logger : ILogger) rid =
     async {
-        query {
-            for r in ctx.Conlang.AxesRuleOverride do
-            where (r.Id = rid)
-        } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> ignore
+        let! lid =
+            query {
+                for ro in ctx.Conlang.RuleOverride do
+                join aro in ctx.Conlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
+                join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
+                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                select a.Language
+            } |> Seq.executeQueryAsync |> Async.AwaitTask
+        do!
+            query {
+                for r in ctx.Conlang.RuleOverride do
+                where (r.Id = rid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
 let getAxesHandler lid =
