@@ -122,37 +122,42 @@ let deleteAxisValueHandler avid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
-let getAxisRulesHandler avid : Map<int, Rule> Async =
+let getAxisRulesHandler sp classes avid : Map<int, Rule> Async =
     async {
         let rules =
             query {
                 for r in ctx.Conlang.Rule do
-                where (r.Axis = avid)
+                join cr in ctx.Conlang.ClassesRule on (r.Id = cr.Rule)
+                where (r.Axis = avid && cr.Class |=| classes && r.SpeechPart = sp)
                 select (r.Id, r.Rule)
             } |> Seq.map (fun (k, r) -> (k, JsonSerializer.Deserialize(r, jsonOptions))) |> Map.ofSeq
         return rules
     }
 
-let postAxisRuleHandler avid (rule : Rule) =
+let postAxisRuleHandler sp classes avid (rule : Rule) =
     async {
-        printfn $"rule: {rule}"
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let row = ctx.Conlang.Rule.Create()
         row.Axis <- avid
+        row.SpeechPart <- sp
         row.Rule <- JsonSerializer.Serialize(rule, jsonOptions)
-        try
+        ctx.SubmitUpdates()
+        let rid = ctx.Conlang.Rule |> Seq.last
+
+        for cl in classes do
+            let clRow = ctx.Conlang.ClassesRule.Create()
+            clRow.Class <- cl
+            clRow.Rule <- rid.Id
             ctx.SubmitUpdates()
-            let lid = query {
-                for a in ctx.Conlang.AxisName do
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-                where (av.Id = avid)
-                select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
+
+        let lid = query {
+            for a in ctx.Conlang.AxisName do
+            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+            where (av.Id = avid)
+            select a.Language
+        }
+        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+
         transaction.Complete()
     }
 
@@ -199,22 +204,93 @@ let deleteAxisRuleHandler rid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
+let getInflectionsStructureHandler lid =
+    async {
+        let inflections =
+            query {
+                for i in ctx.Conlang.Inflection do
+                join ic in ctx.Conlang.InflectionClass on (i.Id = ic.Inflection)
+                join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
+                join sp in ctx.Conlang.SpeechPart on (i.SpeechPart = sp.Name)
+                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
+                where (a.Language = lid && sp.Language = lid)
+                select (i.Id, i.SpeechPart, ic.Class, ia.Axis)
+            }
+        let groupedInflections = inflections |> Seq.groupBy fst4 |> map (
+            fun (k, v) -> (k, { inflectionSpeechPart = head <| map snd4 v
+                              ; inflectionClasses = map thd4 v |> Set |> Set.toList
+                              ; inflectionAxes = map fth4 v |> Seq.toList
+                              })
+        )
+        return groupedInflections |> Map.ofSeq
+    }
+
+let putInflectionHandler iid inflection =
+    async {
+        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+        do!
+            query {
+                for ic in ctx.Conlang.InflectionClass do
+                where (ic.Inflection = iid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+        do!
+            query {
+                for ia in ctx.Conlang.InflectionAxes do
+                where (ia.Inflection = iid)
+            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                            |> map ignore
+
+        for c in inflection.inflectionClasses do
+            let classRow = ctx.Conlang.InflectionClass.Create()
+            classRow.Class <- c
+            classRow.Inflection <- iid
+            ctx.SubmitUpdates()
+
+        for a in inflection.inflectionAxes do
+            let aRow = ctx.Conlang.InflectionAxes.Create()
+            aRow.Axis <- a
+            aRow.Inflection <- iid
+            ctx.SubmitUpdates()
+
+        query {
+            for i in ctx.Conlang.Inflection do
+            where (i.Id = iid)
+        } |> Seq.iter (fun i -> i.SpeechPart <- inflection.inflectionSpeechPart)
+        ctx.SubmitUpdates()
+
+        match inflection.inflectionAxes with
+        | [] -> ()
+        | aid::_ ->
+            let lid = query {
+                for a in ctx.Conlang.AxisName do
+                where (a.Id = aid)
+                select a.Language
+            }
+            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+
+        transaction.Complete()
+    }
+
 let postInflectionHandler inflection =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+        let iRow = ctx.Conlang.Inflection.Create()
+        iRow.SpeechPart <- inflection.inflectionSpeechPart
+        ctx.SubmitUpdates()
+        let iId = ctx.Conlang.Inflection |> Seq.last
+
         for a in inflection.inflectionAxes do
-            let row = ctx.Conlang.Inflection.Create()
-            row.Axis <- a
-            row.SpeechPart <- inflection.inflectionSpeechPart
+            let aRow = ctx.Conlang.InflectionAxes.Create()
+            aRow.Axis <- a
+            aRow.Inflection <- iId.Id
             ctx.SubmitUpdates()
 
-            let iId = ctx.Conlang.Inflection |> Seq.last
-
-            for c in inflection.inflectionClasses do
-                let classRow = ctx.Conlang.InflectionClass.Create()
-                classRow.Class <- c
-                classRow.Inflection <- iId.Id
-                ctx.SubmitUpdates()
+        for c in inflection.inflectionClasses do
+            let classRow = ctx.Conlang.InflectionClass.Create()
+            classRow.Class <- c
+            classRow.Inflection <- iId.Id
+            ctx.SubmitUpdates()
 
         match inflection.inflectionAxes with
         | [] -> ()
@@ -234,7 +310,8 @@ let deleteInflectionHandler iid =
         let! lid =
             query {
                 for i in ctx.Conlang.Inflection do
-                join a in ctx.Conlang.AxisName on (i.Axis = a.Id)
+                join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
+                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
                 select a.Language
             } |> Seq.executeQueryAsync |> Async.AwaitTask
         do!
@@ -246,7 +323,7 @@ let deleteInflectionHandler iid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
-let getOverrideRulesHandler lid =
+let getOverrideRulesHandler sp classes lid =
     async {
         let rules =
             query {
@@ -254,7 +331,8 @@ let getOverrideRulesHandler lid =
                     join aro in ctx.Conlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
                     join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
                     join an in ctx.Conlang.AxisName on (av.Axis = an.Id)
-                    where (an.Language = lid)
+                    join cro in ctx.Conlang.ClassesRuleOverride on (ro.Id = cro.RuleOverride)
+                    where (an.Language = lid && ro.SpeechPart = sp && cro.Class |=| classes)
                     select (ro.Id, ro.Rule, av.Id)
             } |> Seq.toList
         let groupedRules = rules |> List.groupBy (fun (rid, r, _) -> (rid, r))
@@ -267,11 +345,12 @@ let getOverrideRulesHandler lid =
         return groupedRules |> Map.ofList
     }
 
-let postOverrideRuleHandler rule =
+let postOverrideRuleHandler sp classes rule =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let row = ctx.Conlang.RuleOverride.Create()
         row.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions)
+        row.SpeechPart <- sp
         ctx.SubmitUpdates()
 
         let roId = ctx.Conlang.RuleOverride |> Seq.last
@@ -280,6 +359,12 @@ let postOverrideRuleHandler rule =
             let aroRow = ctx.Conlang.AxesRuleOverride.Create()
             aroRow.RuleOverride <- roId.Id
             aroRow.AxisValue <- a
+            ctx.SubmitUpdates()
+
+        for cl in classes do
+            let clRow = ctx.Conlang.ClassesRuleOverride.Create()
+            clRow.Class <- cl
+            clRow.RuleOverride <- roId.Id
             ctx.SubmitUpdates()
 
         let avid = List.head rule.overrideAxes
@@ -350,7 +435,7 @@ let getAxesHandler lid =
     async {
         let axes = query {
             for an in ctx.Conlang.AxisName do
-            join av in ctx.Conlang.AxisValue on (an.Id = av.Axis)
+            join av in !!ctx.Conlang.AxisValue on (an.Id = av.Axis)
             where (an.Language = lid)
             select ((an.Id, an.Name), (av.Id, av.Name))
         }
@@ -358,7 +443,7 @@ let getAxesHandler lid =
         let resp = groupedAxes |> Seq.map (fun (k, v) ->
             let aId = fst k
             let aName = snd k
-            let aValues = v |> Seq.toList |> map snd
+            let aValues = v |> Seq.toList |> map snd |> List.filter (fun (avid, _) -> avid <> 0)
             { id = aId; name = aName; values = aValues }
         )
         return resp
@@ -366,12 +451,9 @@ let getAxesHandler lid =
 
 let getInflectionsHandler lid =
     async {
-        let filteredInflections = inflectTransformations |> Seq.filter
-                                    (fun (KeyValue((l, _, _), _)) ->
-                                        l = lid
-                                    )
-        let resp = filteredInflections |> Seq.map (fun (KeyValue((l, sp, cl), a)) ->
-                { language = l; speechPart = sp; classes = cl; axes = a}
+        let filteredInflections = inflectTransformations[lid]
+        let resp = filteredInflections |> Seq.map (fun (sp, cl, a) ->
+                { language = lid; speechPart = sp; classes = cl; axes = a}
             )
         return resp
     }

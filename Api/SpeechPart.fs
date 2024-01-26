@@ -5,6 +5,8 @@ open FSharpPlus
 open OnlineConlang.DB.Context
 
 open FSharp.Data.Sql
+open Microsoft.Extensions.Logging
+open MySql.Data.MySqlClient
 
 let postSpeechPartHandler lid sp =
     async {
@@ -19,18 +21,15 @@ let postSpeechPartHandler lid sp =
             failwith e.Message
     }
 
-let putSpeechPartHandler lid oldSp newSp =
+let putSpeechPartHandler (logger : ILogger) lid oldSp newSp =
     async {
-        query {
-            for sp in ctx.Conlang.SpeechPart do
-            where (sp.Name = oldSp && sp.Language = lid)
-        } |> Seq.iter (fun sp -> sp.Name <- newSp)
-        try
-            ctx.SubmitUpdates()
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
+        use con = new MySqlConnection(connectionString)
+        con.Open ()
+        // SQLProvider cannot handle updating a column used in the WHERE clause
+        let q = $"UPDATE speech_part SET speech_part.name = '{newSp}'
+                    WHERE speech_part.name = '{oldSp}' AND speech_part.language = {lid}"
+        let cmd = new MySqlCommand(q, con)
+        cmd.ExecuteNonQuery () |> ignore
     }
 
 let deleteSpeechPartHandler lid spName =

@@ -12,6 +12,7 @@ open OnlineConlang.Import.Morphology
 open FSharp.Data.Sql
 open System.Text.Json
 open System.Transactions
+open Microsoft.Extensions.Logging
 
 let postTermHandler lid termApi =
     async {
@@ -84,19 +85,19 @@ let putTermHandler lid tid termApi =
     async {
         let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let! wordClasses =
+        let wordClasses =
             query {
                 for cv in ctx.Conlang.ClassValue do
-                where (Set.contains cv.Name term.wordClasses && cv.Language = lid)
+                where (cv.Name |=| term.wordClasses && cv.Language = lid)
                 select (cv)
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        let! partOfSpeech =
+            } |> Seq.toList
+        let partOfSpeech =
             query {
                 for p in ctx.Conlang.SpeechPart do
                 where (p.Name = term.speechPart && p.Language = lid)
                 select (p)
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        match toList wordClasses, toList partOfSpeech with
+            } |> Seq.toList
+        match wordClasses, partOfSpeech with
         | [], _ ->
             transaction.Complete()
             failwith "class does not exist"
@@ -111,11 +112,8 @@ let putTermHandler lid tid termApi =
                 t.Word <- term.word
                 t.Language <- lid
                 t.SpeechPart <- Some term.speechPart
-
-                if term.transcription.IsSome then t.Transcription <- term.transcription
-                if term.inflection.IsSome then t.Inflection <- term.inflection |> map (fun i ->
-                                                    JsonSerializer.Serialize(i, jsonOptions)
-                                                )
+                t.Transcription <- term.mkTranscription lid |> Some
+                t.Inflection <- Some <| JsonSerializer.Serialize(term.mkInflections lid, jsonOptions)
             )
             ctx.SubmitUpdates()
 
@@ -126,7 +124,7 @@ let putTermHandler lid tid termApi =
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
 
-            wordClasses |> Seq.iter (
+            wordClasses |> iter (
                 fun c ->
                     let rowClass = ctx.Conlang.TermClass.Create()
                     rowClass.Class <- c.Name
@@ -139,13 +137,13 @@ let putTermHandler lid tid termApi =
 
 let getTermsHandler lid =
     async {
-        let! terms =
+        let terms =
             query {
                 for t in ctx.Conlang.Term do
                 join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
                 where (t.Language = lid)
                 select (t, tc.Class)
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
+            }
         let termsResponse =
             terms |> Seq.groupBy fst |> Seq.map (fun (t, tc) ->
                 { TermForAPI.word = t.Word
@@ -162,26 +160,33 @@ let getTermsHandler lid =
         return termsResponse
     }
 
-let postRebuildInflectionsHandler tid =
+let postRebuildInflectionsHandler (logger : ILogger) tid =
     async {
-        let! termWithClasses =
+        let termWithClasses =
             query {
-                            for t in ctx.Conlang.Term do
-                            join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
-                            where (t.Id = tid)
-                            select (t, tc.Class)
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        let term = termWithClasses |> Seq.head |> fst
-        let classes = termWithClasses |> Seq.toList |> map snd |> Set
+                for t in ctx.Conlang.Term do
+                join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
+                where (t.Id = tid)
+                select (t, tc.Class)
+            } |> Seq.toList
+        let term = termWithClasses |> List.head |> fst
+        let classes = termWithClasses |> map snd |> Set
         query {
             for t in ctx.Conlang.Term do
             where (t.Id = tid)
         } |> Seq.iter (fun t ->
             match term.SpeechPart with
             | Some speechPart ->
-                let axes = inflectTransformations[(term.Language, speechPart, classes)]
-                let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
-                let inflection = map (fun names -> (names, inflect term.Word axes (Set names))) allNames
+                let inflections = inflectTransformations[term.Language] |> filter (fun (sp, classes', _) ->
+                    sp = speechPart && classes' = classes
+                )
+                let allAxes = inflections |> map thd3
+                let inflection = allAxes |> map (fun axes ->
+                    logger.LogInformation(axes.ToString())
+                    let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
+                    ( axes.axes |> List.map (fun a -> a.name)
+                    , map (fun names -> (names, inflect term.Word axes names)) allNames)
+                )
                 t.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
             | _ -> ()
         )

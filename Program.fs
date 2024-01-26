@@ -87,7 +87,7 @@ let server (logger : ILogger) : IServer = {
 
     getSpeechParts = getSpeechPartsHandler
     postSpeechPart = postSpeechPartHandler
-    putSpeechPart = putSpeechPartHandler
+    putSpeechPart = putSpeechPartHandler logger
     deleteSpeechPart = deleteSpeechPartHandler
 
     getTranscriptions = getTranscriptionsHandler
@@ -100,7 +100,7 @@ let server (logger : ILogger) : IServer = {
     putTerm = putTermHandler
     deleteTerm = deleteTermHandler
 
-    rebuildInflections = postRebuildInflectionsHandler
+    rebuildInflections = postRebuildInflectionsHandler logger
 
     getAxes = getAxesHandler
     postAxisName = postAxisNameHandler
@@ -122,7 +122,9 @@ let server (logger : ILogger) : IServer = {
     deleteOverrideRule = deleteOverrideRuleHandler logger
 
     getInflections = getInflectionsHandler
+    getInflectionsStructure = getInflectionsStructureHandler
     postInflection = postInflectionHandler
+    putInflection = putInflectionHandler
     deleteInflection = deleteInflectionHandler
 
     postPhonemeClass = postPhonemeClassHandler
