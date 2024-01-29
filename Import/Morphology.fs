@@ -22,8 +22,8 @@ let jsonOptions =
 let infixSeparator = '·'
 
 let performFusion (w1 : string) (w2 : string) t =
-    let word = snd <| transformWord t (w1 + " " + w2)
-    String.collect (fun c -> if c = ' ' then "" else string c) word
+    let word = snd <| transformWord t (w1 + "$" + w2)
+    String.collect (fun c -> if c = '$' then "" else string c) word
 
 let addSuffix word suffix fusion = performFusion word suffix fusion
 
@@ -42,9 +42,9 @@ let addAffix word affix =
     | Suffix (s, f) -> addSuffix word s f
     | Infix (i, f1, f2, pos) -> addInfix word i f1 f2 pos
 
-let inflectTransformations = new Dictionary<int, list<PartOfSpeech * (Class Set) * Axes>>()
+let inflectTransformations = new Dictionary<int * int, string Option * PartOfSpeech * (Class Set) * Axes>()
 
-let buildAxis sp classes aid =
+let buildAxis iid aid =
     let axisName = query {
                         for an in ctx.Conlang.AxisName do
                         where (an.Id = aid)
@@ -57,18 +57,19 @@ let buildAxis sp classes aid =
                         } |> Seq.toList
     let axisRules = axisValues |> map (
         fun avId ->
-            let rules = query {
-                            for r in ctx.Conlang.Rule do
-                            join cr in ctx.Conlang.ClassesRule on (r.Id = cr.Rule)
-                            where (r.Axis = avId && r.SpeechPart = sp && cr.Class |=| classes)
-                            select (r.Rule)
-                        } |> Seq.toList
+            let rules =
+                query {
+                    for r in ctx.Conlang.Rule do
+                    where (r.Axis = avId && r.Inflection = iid)
+                    select (r.Id, r.Rule)
+                } |> Seq.toList |> List.distinctBy fst |> map snd
             (avId, rules |> map (fun r -> JsonSerializer.Deserialize(r, jsonOptions)))
     )
     ({ name = axisName; inflections = Map axisRules }, axisValues)
 
-let buildAxes sp classes (aidList : int list) =
-    let (axisList, axisIds) = (map (fst << buildAxis sp classes) aidList, map (snd << buildAxis sp classes) aidList)
+let buildAxes iid (aidList : int list) =
+    let axisList, axisIds = (map (fst << buildAxis iid) aidList,
+                             map (snd << buildAxis iid) aidList)
     let flattenedIds = List.concat axisIds
     let cartIds = cartesian axisIds |> List.map Set
     let overrides = query {
@@ -79,15 +80,18 @@ let buildAxes sp classes (aidList : int list) =
     let filteredIds = overrides |> filter (fun o -> List.contains (Set <| snd o) cartIds)
     let overrideRules = filteredIds |> map (
         fun (rId, avIds) ->
-            let rules = query {
-                            for ro in ctx.Conlang.RuleOverride do
-                            join cro in ctx.Conlang.ClassesRuleOverride on (ro.Id = cro.RuleOverride)
-                            where (ro.Id = rId && cro.Class |=| classes && ro.SpeechPart = sp)
-                            select ro.Rule
-                        } |> Seq.toList |> map (fun r -> JsonSerializer.Deserialize(r, jsonOptions))
-            (avIds, rules)
+            let (orules : Rule list) =
+                query {
+                    for ro in ctx.Conlang.RuleOverride do
+                    where (ro.Id = rId && ro.Inflection = iid)
+                    select (ro.Id, ro.Rule)
+                } |> Seq.toList |> List.distinctBy fst |> map snd
+                  |> map (fun r -> JsonSerializer.Deserialize(r, jsonOptions))
+            match orules with
+            | [] -> None
+            | rules -> Some (avIds, rules)
     )
-    { axes = axisList; overrides = overrideRules }
+    { axes = axisList; overrides = overrideRules |> List.choose id }
 
 let updateInflectTransformations lid =
     inflectTransformations.Clear()
@@ -98,18 +102,19 @@ let updateInflectTransformations lid =
         join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
         join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
         where (a.Language = lid && sp.Language = lid)
-        select (i.Id, i.SpeechPart, ic.Class, ia.Axis)
+        select (i.Id, i.Name, i.SpeechPart, ic.Class, ia.Axis)
     }
-    let groupedInflections = inflections |> Seq.groupBy fst4 |> map (
-        fun (_, v) -> ( head <| map snd4 v
-                      , map thd4 v |> Set
-                      , map fth4 v |> Seq.toList
+    let groupedInflections = inflections |> Seq.groupBy fst5 |> map (
+        fun (k, v) -> ( k
+                      , head <| map snd5 v
+                      , head <| map thd5 v
+                      , map fth5 v |> Set
+                      , map ffh5 v |> Seq.toList |> List.distinct
                       )
     )
-    inflectTransformations.Add(lid,
-        groupedInflections |> toList |> map (
-            fun (sp, classes, axes) ->(sp, classes, buildAxes sp classes axes)
-    ))
+    groupedInflections |> toList |> iter (fun (k, name, sp, classes, axes) ->
+        inflectTransformations.Add((lid, k), (name, sp, classes, buildAxes k axes))
+    )
 
 let rec private inflect' word rules =
     match rules with

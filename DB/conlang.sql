@@ -32,7 +32,7 @@ CREATE TABLE `axes_rule_override` (
   KEY `axis_value_idx` (`axis_value`),
   CONSTRAINT `aro_axis_value` FOREIGN KEY (`axis_value`) REFERENCES `axis_value` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `aro_rule_override` FOREIGN KEY (`rule_override`) REFERENCES `rule_override` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=333 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1419 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -105,46 +105,6 @@ CREATE TABLE `class_value` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `classes_rule`
---
-
-DROP TABLE IF EXISTS `classes_rule`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `classes_rule` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `rule` int NOT NULL,
-  `class` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `id_UNIQUE` (`id`),
-  KEY `a_r_rule_idx` (`rule`),
-  KEY `a_r_class_idx` (`class`),
-  CONSTRAINT `c_r_class` FOREIGN KEY (`class`) REFERENCES `class_value` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `c_r_rule` FOREIGN KEY (`rule`) REFERENCES `rule` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `classes_rule_override`
---
-
-DROP TABLE IF EXISTS `classes_rule_override`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `classes_rule_override` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `rule_override` int NOT NULL,
-  `class` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `id_UNIQUE` (`id`),
-  KEY `cl_r_o_class_idx` (`class`),
-  KEY `cl_r_o_rule_override_idx` (`rule_override`),
-  CONSTRAINT `cl_r_o_class` FOREIGN KEY (`class`) REFERENCES `class_value` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `cl_r_o_rule_override` FOREIGN KEY (`rule_override`) REFERENCES `rule_override` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `inflection`
 --
 
@@ -154,11 +114,12 @@ DROP TABLE IF EXISTS `inflection`;
 CREATE TABLE `inflection` (
   `id` int NOT NULL AUTO_INCREMENT,
   `speech_part` varchar(255) NOT NULL,
+  `name` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
-  KEY `speech_part_idx` (`speech_part`),
-  CONSTRAINT `i_speech_part` FOREIGN KEY (`speech_part`) REFERENCES `speech_part` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `inf_speech_part_idx` (`speech_part`),
+  CONSTRAINT `inf_speech_part` FOREIGN KEY (`speech_part`) REFERENCES `speech_part` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -174,11 +135,11 @@ CREATE TABLE `inflection_axes` (
   `inflection` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
-  KEY `fk_inflection_axes_inflection_idx` (`inflection`),
-  KEY `fk_inflection_axes_axis_name_idx` (`axis`),
-  CONSTRAINT `fk_inflection_axes_axis_name` FOREIGN KEY (`axis`) REFERENCES `axis_name` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_inflection_axes_inflection` FOREIGN KEY (`inflection`) REFERENCES `inflection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `i_a_axis_name_idx` (`axis`),
+  KEY `i_a_inflection_idx` (`inflection`),
+  CONSTRAINT `i_a_axis_name` FOREIGN KEY (`axis`) REFERENCES `axis_name` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `i_a_inflection` FOREIGN KEY (`inflection`) REFERENCES `inflection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -190,15 +151,15 @@ DROP TABLE IF EXISTS `inflection_class`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `inflection_class` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `inflection` int NOT NULL,
   `class` varchar(255) NOT NULL,
+  `inflection` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
-  KEY `ic_class_idx` (`class`),
-  KEY `ic_inflection_idx` (`inflection`),
-  CONSTRAINT `ic_class` FOREIGN KEY (`class`) REFERENCES `class_value` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `ic_inflection` FOREIGN KEY (`inflection`) REFERENCES `inflection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `i_c_class_idx` (`class`),
+  KEY `i_c_inflection_idx` (`inflection`),
+  CONSTRAINT `i_c_class` FOREIGN KEY (`class`) REFERENCES `class_value` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `i_c_inflection` FOREIGN KEY (`inflection`) REFERENCES `inflection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -275,15 +236,14 @@ CREATE TABLE `rule` (
   `id` int NOT NULL AUTO_INCREMENT,
   `rule` varchar(255) NOT NULL,
   `axis` int NOT NULL,
-  `speech_part` varchar(255) NOT NULL,
+  `inflection` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
   KEY `r_axis_idx` (`axis`),
-  KEY `r_speech_part_idx` (`speech_part`),
-  KEY `rule_speech_part_idx` (`speech_part`),
+  KEY `r_inflection_idx` (`inflection`),
   CONSTRAINT `r_axis` FOREIGN KEY (`axis`) REFERENCES `axis_value` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `r_speech_part` FOREIGN KEY (`speech_part`) REFERENCES `speech_part` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  CONSTRAINT `r_inflection` FOREIGN KEY (`inflection`) REFERENCES `inflection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -296,13 +256,12 @@ DROP TABLE IF EXISTS `rule_override`;
 CREATE TABLE `rule_override` (
   `id` int NOT NULL AUTO_INCREMENT,
   `rule` varchar(255) NOT NULL,
-  `speech_part` varchar(255) NOT NULL,
+  `inflection` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
-  KEY `r_o_speech_part_idx` (`speech_part`),
-  KEY `rule_o_speech_part_idx` (`speech_part`),
-  CONSTRAINT `r_o_speech_part` FOREIGN KEY (`speech_part`) REFERENCES `speech_part` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `r_o_inflection_idx` (`inflection`),
+  CONSTRAINT `r_o_inflection` FOREIGN KEY (`inflection`) REFERENCES `inflection` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=209 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -359,7 +318,7 @@ CREATE TABLE `term` (
   KEY `t_language_idx` (`language`),
   CONSTRAINT `t_language` FOREIGN KEY (`language`) REFERENCES `language` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `t_speech_part` FOREIGN KEY (`speech_part`) REFERENCES `speech_part` (`name`) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -379,7 +338,7 @@ CREATE TABLE `term_class` (
   KEY `tc_class_idx` (`class`),
   CONSTRAINT `tc_class` FOREIGN KEY (`class`) REFERENCES `class_value` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `tc_term` FOREIGN KEY (`term`) REFERENCES `term` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -409,4 +368,4 @@ CREATE TABLE `transcription_rule` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-01-26 10:47:27
+-- Dump completed on 2024-01-29 21:17:09

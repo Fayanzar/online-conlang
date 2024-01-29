@@ -20,6 +20,12 @@ let snd4 (_, y, _, _) = y
 let thd4 (_, _, z, _) = z
 let fth4 (_, _, _, w) = w
 
+let fst5 (x, _, _, _, _) = x
+let snd5 (_, y, _, _, _) = y
+let thd5 (_, _, z, _, _) = z
+let fth5 (_, _, _, u, _) = u
+let ffh5 (_, _, _, _, v) = v
+
 let badRequest400 msg =
     RequestErrors.BAD_REQUEST { errorCode = 400; message = msg }
 

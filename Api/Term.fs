@@ -177,15 +177,23 @@ let postRebuildInflectionsHandler (logger : ILogger) tid =
         } |> Seq.iter (fun t ->
             match term.SpeechPart with
             | Some speechPart ->
-                let inflections = inflectTransformations[term.Language] |> filter (fun (sp, classes', _) ->
-                    sp = speechPart && classes' = classes
-                )
-                let allAxes = inflections |> map thd3
-                let inflection = allAxes |> map (fun axes ->
+                let inflections =
+                    inflectTransformations
+                    |> toList
+                    |> filter (fun a ->
+                        let (l, _) = a.Key
+                        let (_, sp, classes', _) = a.Value
+                        sp = speechPart
+                        && Set.isSubset classes classes'
+                        && l = term.Language
+                    ) |> map (fun i -> i.Value)
+                let axesWithNames = inflections |> map (fun (name, _, _, axes) -> (name, axes))
+                let inflection = axesWithNames |> map (fun (name, axes) ->
                     logger.LogInformation(axes.ToString())
                     let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
+                    (name,
                     ( axes.axes |> List.map (fun a -> a.name)
-                    , map (fun names -> (names, inflect term.Word axes names)) allNames)
+                    , map (fun names -> (names, inflect term.Word axes names)) allNames))
                 )
                 t.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
             | _ -> ()

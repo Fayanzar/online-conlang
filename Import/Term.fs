@@ -14,7 +14,7 @@ type Term =
         word              : string
         speechPart        : PartOfSpeech
         wordClasses       : Class Set
-        inflection        : ((string list) * ((int list) * string) list) list Option
+        inflection        : (string Option * ((string list) * ((int list) * string) list)) list Option
         transcription     : string Option
     }
     with
@@ -24,15 +24,23 @@ type Term =
             SyllabifyWord lid this.word transcriptionTransformations[lid] syllable
         else this.word
     member this.mkInflections lid =
-        if List.contains lid (toList inflectTransformations.Keys) then
-            let inflection = inflectTransformations[lid] |> filter (fun (sp, classes, _) ->
-                sp = this.speechPart && classes = this.wordClasses
-            )
-            let allAxes = inflection |> map thd3
-            allAxes |> map (fun axes ->
+        if ((toList inflectTransformations.Keys) |> filter (fun (l, _) -> l = lid)) <> [] then
+            let inflections =
+                inflectTransformations
+                |> toList
+                |> filter (fun a ->
+                    let (l, _) = a.Key
+                    let (_, sp, classes, _) = a.Value
+                    sp = this.speechPart
+                    && classes = this.wordClasses
+                    && l = lid
+                ) |> map (fun i -> i.Value)
+            let axesWithNames = inflections |> map (fun (name, _, _, axes) -> (name, axes))
+            axesWithNames |> map (fun (name, axes) ->
                 let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
+                ( name,
                 ( axes.axes |> map (fun a -> a.name)
-                , map (fun names -> (names, inflect this.word axes names)) allNames)
+                , map (fun names -> (names, inflect this.word axes names)) allNames))
             )
         else
             []

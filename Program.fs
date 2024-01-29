@@ -113,18 +113,20 @@ let server (logger : ILogger) : IServer = {
 
     getAxisRules = getAxisRulesHandler
     postAxisRule = postAxisRuleHandler
+    postAxisRules = postAxisRulesHandler
     putAxisRule = putAxisRuleHandler logger
     deleteAxisRule = deleteAxisRuleHandler
 
     getOverrideRules = getOverrideRulesHandler
     postOverrideRule = postOverrideRuleHandler
+    postOverrideRules = postOverrideRulesHandler
     putOverrideRule = putOverrideRuleHandler logger
     deleteOverrideRule = deleteOverrideRuleHandler logger
 
     getInflections = getInflectionsHandler
-    getInflectionsStructure = getInflectionsStructureHandler
+    getInflectionsStructure = getInflectionsStructureHandler logger
     postInflection = postInflectionHandler
-    putInflection = putInflectionHandler
+    putInflection = putInflectionHandler logger
     deleteInflection = deleteInflectionHandler
 
     postPhonemeClass = postPhonemeClassHandler
