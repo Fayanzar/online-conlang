@@ -5,8 +5,9 @@ open FSharpPlus
 open OnlineConlang.DB.Context
 
 open FSharp.Data.Sql
+open Microsoft.Extensions.Logging
 
-let postClassHandler lid c =
+let postClassHandler (logger : ILogger) lid c =
     async {
         let row = ctx.Conlang.ClassName.Create()
         row.Language <- lid
@@ -19,7 +20,7 @@ let postClassHandler lid c =
             failwith e.Message
     }
 
-let putClassHandler lid oldC newC =
+let putClassHandler (logger : ILogger) lid oldC newC =
     async {
         query {
             for c in ctx.Conlang.ClassName do
@@ -32,7 +33,7 @@ let putClassHandler lid oldC newC =
             ctx.ClearUpdates() |> ignore
             failwith e.Message
     }
-let deleteClassHandler lid cName =
+let deleteClassHandler (logger : ILogger) lid cName =
     async {
         do!
             query {
@@ -42,7 +43,7 @@ let deleteClassHandler lid cName =
                                                             |> map ignore
     }
 
-let postClassValueHandler lid cn cv =
+let postClassValueHandler (logger : ILogger) lid cn cv =
     async {
         let row = ctx.Conlang.ClassValue.Create()
         row.Language <- lid
@@ -56,7 +57,7 @@ let postClassValueHandler lid cn cv =
             failwith e.Message
     }
 
-let putClassValueHandler lid c oldCv newCv =
+let putClassValueHandler (logger : ILogger) lid c oldCv newCv =
     async {
         let className = query {
             for cn in ctx.Conlang.ClassName do
@@ -78,7 +79,7 @@ let putClassValueHandler lid c oldCv newCv =
                 failwith e.Message
     }
 
-let deleteClassValueHandler lid c cValue =
+let deleteClassValueHandler (logger : ILogger) lid c cValue =
     async {
         do!
             query {
@@ -88,7 +89,7 @@ let deleteClassValueHandler lid c cValue =
                                                             |> map ignore
     }
 
-let getClassesHandler lid =
+let getClassesHandler (logger : ILogger) lid =
     async {
         let! classes =
             query {

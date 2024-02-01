@@ -70,68 +70,85 @@ module Views =
 // Web app
 // ---------------------------------
 
+type SecurityToken = SecurityToken of string
+
+// possible errors when logging in
+type LoginError =
+    | UserDoesNotExist
+    | PasswordIncorrect
+    | AccountBanned
+
+// a request with a token
+type SecureRequest<'T> = { token : SecurityToken; content : 'T }
+
+// possible authentication/authorization errors
+type AuthenticationError =
+   | UserTokenExpired
+   | TokenInvalid
+   | UserDoesNotHaveAccess
+
 let server (logger : ILogger) : IServer = {
-    getLanguages = getLanguagesHandler
-    deleteLanguage = deleteLanguageHandler
-    postLanguage = postLanguageHandler
-    putLanguage = putLanguageHandler
+    getLanguages = getLanguagesHandler logger
+    deleteLanguage = deleteLanguageHandler logger
+    postLanguage = postLanguageHandler logger
+    putLanguage = putLanguageHandler logger
 
-    getClasses = getClassesHandler
-    postClass = postClassHandler
-    putClass = putClassHandler
-    deleteClass = deleteClassHandler
+    getClasses = getClassesHandler logger
+    postClass = postClassHandler logger
+    putClass = putClassHandler logger
+    deleteClass = deleteClassHandler logger
 
-    postClassValue = postClassValueHandler
-    putClassValue = putClassValueHandler
-    deleteClassValue = deleteClassValueHandler
+    postClassValue = postClassValueHandler logger
+    putClassValue = putClassValueHandler logger
+    deleteClassValue = deleteClassValueHandler logger
 
-    getSpeechParts = getSpeechPartsHandler
-    postSpeechPart = postSpeechPartHandler
+    getSpeechParts = getSpeechPartsHandler logger
+    postSpeechPart = postSpeechPartHandler logger
     putSpeechPart = putSpeechPartHandler logger
-    deleteSpeechPart = deleteSpeechPartHandler
+    deleteSpeechPart = deleteSpeechPartHandler logger
 
-    getTranscriptions = getTranscriptionsHandler
-    postTranscription = postTranscriptionHandler
-    putTranscription = putTranscriptionHandler
-    deleteTranscription = deleteTranscriptionHandler
+    getTranscriptions = getTranscriptionsHandler logger
+    postTranscription = postTranscriptionHandler logger
+    putTranscription = putTranscriptionHandler logger
+    deleteTranscription = deleteTranscriptionHandler logger
 
-    getTerms = getTermsHandler
-    postTerm = postTermHandler
-    putTerm = putTermHandler
-    deleteTerm = deleteTermHandler
+    getTerms = getTermsHandler logger
+    postTerm = postTermHandler logger
+    putTerm = putTermHandler logger
+    deleteTerm = deleteTermHandler logger
 
     rebuildInflections = postRebuildInflectionsHandler logger
 
-    getAxes = getAxesHandler
-    postAxisName = postAxisNameHandler
-    putAxisName = putAxisNameHandler
-    deleteAxisName = deleteAxisNameHandler
+    getAxes = getAxesHandler logger
+    postAxisName = postAxisNameHandler logger
+    putAxisName = putAxisNameHandler logger
+    deleteAxisName = deleteAxisNameHandler logger
 
-    postAxisValue = postAxisValueHandler
-    putAxisValue = putAxisValueHandler
-    deleteAxisValue = deleteAxisValueHandler
+    postAxisValue = postAxisValueHandler logger
+    putAxisValue = putAxisValueHandler logger
+    deleteAxisValue = deleteAxisValueHandler logger
 
-    getAxisRules = getAxisRulesHandler
-    postAxisRule = postAxisRuleHandler
-    postAxisRules = postAxisRulesHandler
+    getAxisRules = getAxisRulesHandler logger
+    postAxisRule = postAxisRuleHandler logger
+    postAxisRules = postAxisRulesHandler logger
     putAxisRule = putAxisRuleHandler logger
-    deleteAxisRule = deleteAxisRuleHandler
+    deleteAxisRule = deleteAxisRuleHandler logger
 
-    getOverrideRules = getOverrideRulesHandler
-    postOverrideRule = postOverrideRuleHandler
-    postOverrideRules = postOverrideRulesHandler
+    getOverrideRules = getOverrideRulesHandler logger
+    postOverrideRule = postOverrideRuleHandler logger
+    postOverrideRules = postOverrideRulesHandler logger
     putOverrideRule = putOverrideRuleHandler logger
     deleteOverrideRule = deleteOverrideRuleHandler logger
 
-    getInflections = getInflectionsHandler
+    getInflections = getInflectionsHandler logger
     getInflectionsStructure = getInflectionsStructureHandler logger
-    postInflection = postInflectionHandler
+    postInflection = postInflectionHandler logger
     putInflection = putInflectionHandler logger
-    deleteInflection = deleteInflectionHandler
+    deleteInflection = deleteInflectionHandler logger
 
-    postPhonemeClass = postPhonemeClassHandler
-    putPhonemeClass = putPhonemeClassHandler
-    deletePhonemeClass = deletePhonemeClassHandler
+    postPhonemeClass = postPhonemeClassHandler logger
+    putPhonemeClass = putPhonemeClassHandler logger
+    deletePhonemeClass = deletePhonemeClassHandler logger
 }
 
 let serverAPI (ctx: HttpContext) : IServer =

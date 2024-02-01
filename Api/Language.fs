@@ -7,8 +7,9 @@ open SharedModels
 open OnlineConlang.DB.Context
 
 open FSharp.Data.Sql
+open Microsoft.Extensions.Logging
 
-let postLanguageHandler language =
+let postLanguageHandler (logger : ILogger) language =
     async {
         let row = ctx.Conlang.Language.Create()
         row.Name <- language
@@ -20,7 +21,7 @@ let postLanguageHandler language =
             failwith e.Message
     }
 
-let deleteLanguageHandler lid =
+let deleteLanguageHandler (logger : ILogger) lid =
     async {
         do!
             query {
@@ -30,7 +31,7 @@ let deleteLanguageHandler lid =
                                                             |> map ignore
     }
 
-let putLanguageHandler lid newName =
+let putLanguageHandler (logger : ILogger) lid newName =
     async {
         query {
             for l in ctx.Conlang.Language do
@@ -44,7 +45,7 @@ let putLanguageHandler lid newName =
             failwith e.Message
     }
 
-let getLanguagesHandler =
+let getLanguagesHandler (logger : ILogger) =
     async {
         let! langs =
             query {

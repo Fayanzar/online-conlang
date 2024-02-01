@@ -9,8 +9,9 @@ open OnlineConlang.Import.Phonotactics
 
 open FSharp.Data.Sql
 open System.Text.Json
+open Microsoft.Extensions.Logging
 
-let postTranscriptionHandler lid (rule : Transformation) =
+let postTranscriptionHandler (logger : ILogger) lid (rule : Transformation) =
     async {
         let row = ctx.Conlang.TranscriptionRule.Create()
         row.Language <- lid
@@ -24,7 +25,7 @@ let postTranscriptionHandler lid (rule : Transformation) =
             failwith e.Message
     }
 
-let putTranscriptionHandler lid tid (rule : Transformation) =
+let putTranscriptionHandler (logger : ILogger) lid tid (rule : Transformation) =
     async {
         query {
             for r in ctx.Conlang.TranscriptionRule do
@@ -41,7 +42,7 @@ let putTranscriptionHandler lid tid (rule : Transformation) =
             failwith e.Message
     }
 
-let deleteTranscriptionHandler lid tid =
+let deleteTranscriptionHandler (logger : ILogger) lid tid =
     async {
         do!
             query {
@@ -52,7 +53,7 @@ let deleteTranscriptionHandler lid tid =
         updateTranscriptionTransformations lid
     }
 
-let getTranscriptionsHandler lid =
+let getTranscriptionsHandler (logger : ILogger) lid =
     async {
         let rules : Transformation list =
             query {

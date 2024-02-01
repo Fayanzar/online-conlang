@@ -8,7 +8,7 @@ open FSharp.Data.Sql
 open Microsoft.Extensions.Logging
 open MySql.Data.MySqlClient
 
-let postSpeechPartHandler lid sp =
+let postSpeechPartHandler (logger : ILogger) lid sp =
     async {
         let row = ctx.Conlang.SpeechPart.Create()
         row.Language <- lid
@@ -32,7 +32,7 @@ let putSpeechPartHandler (logger : ILogger) lid oldSp newSp =
         cmd.ExecuteNonQuery () |> ignore
     }
 
-let deleteSpeechPartHandler lid spName =
+let deleteSpeechPartHandler (logger : ILogger) lid spName =
     async {
         do!
             query {
@@ -42,7 +42,7 @@ let deleteSpeechPartHandler lid spName =
                                                             |> map ignore
     }
 
-let getSpeechPartsHandler lid =
+let getSpeechPartsHandler (logger : ILogger) lid =
     async {
         let! parts =
             query {

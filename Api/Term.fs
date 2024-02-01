@@ -14,7 +14,7 @@ open System.Text.Json
 open System.Transactions
 open Microsoft.Extensions.Logging
 
-let postTermHandler lid termApi =
+let postTermHandler (logger : ILogger) lid termApi =
     async {
         let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
@@ -71,7 +71,7 @@ let postTermHandler lid termApi =
                 transaction.Complete()
     }
 
-let deleteTermHandler lid tid =
+let deleteTermHandler (logger : ILogger) lid tid =
     async {
         do!
             query {
@@ -81,7 +81,7 @@ let deleteTermHandler lid tid =
                                                             |> map ignore
     }
 
-let putTermHandler lid tid termApi =
+let putTermHandler (logger : ILogger) lid tid termApi =
     async {
         let term = parseTerm termApi
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
@@ -135,7 +135,7 @@ let putTermHandler lid tid termApi =
             transaction.Complete()
     }
 
-let getTermsHandler lid =
+let getTermsHandler (logger : ILogger) lid =
     async {
         let terms =
             query {

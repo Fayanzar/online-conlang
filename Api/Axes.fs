@@ -14,7 +14,7 @@ open Microsoft.Extensions.Logging
 open System.Text.Json
 open System.Transactions
 
-let postAxisNameHandler lid an =
+let postAxisNameHandler (logger : ILogger) lid an =
     async {
         let row = ctx.Conlang.AxisName.Create()
         row.Language <- lid
@@ -27,7 +27,7 @@ let postAxisNameHandler lid an =
             failwith e.Message
     }
 
-let putAxisNameHandler aid an =
+let putAxisNameHandler (logger : ILogger) aid an =
     async {
         query {
             for a in ctx.Conlang.AxisName do
@@ -47,7 +47,7 @@ let putAxisNameHandler aid an =
             failwith e.Message
     }
 
-let deleteAxisNameHandler aid =
+let deleteAxisNameHandler (logger : ILogger) aid =
     async {
         let! lid =
             query {
@@ -64,7 +64,7 @@ let deleteAxisNameHandler aid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
-let postAxisValueHandler aid av =
+let postAxisValueHandler (logger : ILogger) aid av =
     async {
         let row = ctx.Conlang.AxisValue.Create()
         row.Axis <- aid
@@ -83,7 +83,7 @@ let postAxisValueHandler aid av =
             failwith e.Message
     }
 
-let putAxisValueHandler avid av =
+let putAxisValueHandler (logger : ILogger) avid av =
     async {
         query {
             for a in ctx.Conlang.AxisValue do
@@ -104,7 +104,7 @@ let putAxisValueHandler avid av =
             failwith e.Message
     }
 
-let deleteAxisValueHandler avid =
+let deleteAxisValueHandler (logger : ILogger) avid =
     async {
         let! lid =
             query {
@@ -122,7 +122,7 @@ let deleteAxisValueHandler avid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
-let getAxisRulesHandler i avid : Map<int, Rule> Async =
+let getAxisRulesHandler (logger : ILogger) i avid : Map<int, Rule> Async =
     async {
         let rules =
             query {
@@ -133,7 +133,7 @@ let getAxisRulesHandler i avid : Map<int, Rule> Async =
         return rules
     }
 
-let postAxisRulesHandler i avid (rules : Rule list) =
+let postAxisRulesHandler (logger : ILogger) i avid (rules : Rule list) =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         for rule in rules do
@@ -153,7 +153,7 @@ let postAxisRulesHandler i avid (rules : Rule list) =
         transaction.Complete()
     }
 
-let postAxisRuleHandler i avid (rule : Rule) =
+let postAxisRuleHandler (logger : ILogger) i avid (rule : Rule) =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         do!
@@ -203,7 +203,7 @@ let putAxisRuleHandler (_ : ILogger) rid (rule : Rule) =
         transaction.Complete()
     }
 
-let deleteAxisRuleHandler rid =
+let deleteAxisRuleHandler (logger : ILogger) rid =
     async {
         let! lid =
             query {
@@ -350,7 +350,7 @@ let putInflectionHandler (logger : ILogger) iid inflection =
         transaction.Complete()
     }
 
-let postInflectionHandler inflection =
+let postInflectionHandler (logger : ILogger) inflection =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let iRow = ctx.Conlang.Inflection.Create()
@@ -384,7 +384,7 @@ let postInflectionHandler inflection =
         transaction.Complete()
     }
 
-let deleteInflectionHandler iid =
+let deleteInflectionHandler (logger : ILogger) iid =
     async {
         let! lid =
             query {
@@ -403,7 +403,7 @@ let deleteInflectionHandler iid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
-let getOverrideRulesHandler i lid =
+let getOverrideRulesHandler (logger : ILogger) i lid =
     async {
         let rules =
             query {
@@ -424,7 +424,7 @@ let getOverrideRulesHandler i lid =
         return groupedRules |> Map.ofList
     }
 
-let postOverrideRulesHandler i rules =
+let postOverrideRulesHandler (logger : ILogger) i rules =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         do!
@@ -461,7 +461,7 @@ let postOverrideRulesHandler i rules =
         transaction.Complete()
     }
 
-let postOverrideRuleHandler i rule =
+let postOverrideRuleHandler (logger : ILogger) i rule =
     async {
         use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
         let row = ctx.Conlang.RuleOverride.Create()
@@ -541,7 +541,7 @@ let deleteOverrideRuleHandler (logger : ILogger) rid =
         lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
     }
 
-let getAxesHandler lid =
+let getAxesHandler (logger : ILogger) lid =
     async {
         let axes = query {
             for an in ctx.Conlang.AxisName do
@@ -559,7 +559,7 @@ let getAxesHandler lid =
         return resp
     }
 
-let getInflectionsHandler lid =
+let getInflectionsHandler (logger : ILogger) lid =
     async {
         let filteredInflections =
             inflectTransformations

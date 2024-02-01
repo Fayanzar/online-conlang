@@ -12,8 +12,9 @@ open OnlineConlang.DB.Context
 open FSharp.Data.Sql
 
 open System.Text.Json
+open Microsoft.Extensions.Logging
 
-let postPhonemeClassHandler lid (cl : char) (p : char option) =
+let postPhonemeClassHandler (logger : ILogger) lid (cl : char) (p : char option) =
     async {
         let parent = option id 'P' p
         let classes = query {
@@ -35,7 +36,7 @@ let postPhonemeClassHandler lid (cl : char) (p : char option) =
                 failwith e.Message
     }
 
-let putPhonemeClassHandler lid (cl : char) (newCl : char) =
+let putPhonemeClassHandler (logger : ILogger) lid (cl : char) (newCl : char) =
     async {
         let classes = query {
             for p in ctx.Conlang.PhonemeClass do
@@ -68,7 +69,7 @@ let rec getClassesForDeletion lid (parents : string list) =
         }
         parents @ getClassesForDeletion lid (Seq.toList classes)
 
-let deletePhonemeClassHandler lid (cl : char) =
+let deletePhonemeClassHandler (logger : ILogger) lid (cl : char) =
     async {
         let classes = getClassesForDeletion lid [string cl]
         do!
@@ -90,7 +91,7 @@ let rec private updateChildPhonemes cl pc (phonemes : Phoneme Set) =
         } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> Async.RunSynchronously |> ignore
         Node (k, v </Set.intersect/> phonemes, map (fun p -> updateChildPhonemes cl p phonemes) l)
 
-let putPhonemesPhonemeClass lid (cl : char) (phonemes : Phoneme Set) =
+let putPhonemesPhonemeClass (logger : ILogger) lid (cl : char) (phonemes : Phoneme Set) =
     async {
         let classes = query {
                             for p in ctx.Conlang.PhonemeClass do
