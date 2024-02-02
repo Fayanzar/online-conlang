@@ -47,3 +47,8 @@ let jsonOptions =
         .WithUnionExternalTag()
         .WithUnionNamedFields()
         .ToJsonSerializerOptions()
+
+type Either<'a, 'b> = Choice<'a, 'b>
+let Left x : Either<'a, 'b> = Choice1Of2 x
+let Right x : Either<'a, 'b> = Choice2Of2 x
+let (|Left|Right|) = function Choice1Of2 x -> Left x | Choice2Of2 x -> Right x

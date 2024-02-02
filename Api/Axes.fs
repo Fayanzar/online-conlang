@@ -7,119 +7,153 @@ open SharedModels
 open OnlineConlang.Prelude
 
 open OnlineConlang.DB.Context
+
 open OnlineConlang.Import.Morphology
+open OnlineConlang.Import.User
 
 open FSharp.Data.Sql
 open Microsoft.Extensions.Logging
 open System.Text.Json
 open System.Transactions
 
-let postAxisNameHandler (logger : ILogger) lid an =
+let postAxisNameHandler (logger : ILogger) stoken lid an =
     async {
-        let row = ctx.Conlang.AxisName.Create()
-        row.Language <- lid
-        row.Name <- an
-        try
-            ctx.SubmitUpdates()
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            let row = ctx.Conlang.AxisName.Create()
+            row.Language <- lid
+            row.Name <- an
+            try
+                ctx.SubmitUpdates()
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }
 
-let putAxisNameHandler (logger : ILogger) aid an =
+let putAxisNameHandler (logger : ILogger) stoken aid an =
     async {
-        query {
-            for a in ctx.Conlang.AxisName do
-            where (a.Id = aid)
-        } |> Seq.iter (fun a -> a.Name <- an)
-        try
-            ctx.SubmitUpdates()
-            let lid = query {
-                    for a in ctx.Conlang.AxisName do
-                    where (a.Id = aid)
-                    select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
-    }
-
-let deleteAxisNameHandler (logger : ILogger) aid =
-    async {
-        let! lid =
+        let lid =
             query {
                 for a in ctx.Conlang.AxisName do
                 where (a.Id = aid)
                 select a.Language
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        do!
+            } |> Seq.head
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
             query {
-                for an in ctx.Conlang.AxisName do
-                where (an.Id = aid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+                for a in ctx.Conlang.AxisName do
+                where (a.Id = aid)
+            } |> Seq.iter (fun a -> a.Name <- an)
+            try
+                ctx.SubmitUpdates()
+                let lid = query {
+                        for a in ctx.Conlang.AxisName do
+                        where (a.Id = aid)
+                        select a.Language
+                }
+                lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }
 
-let postAxisValueHandler (logger : ILogger) aid av =
+let deleteAxisNameHandler (logger : ILogger) stoken aid =
     async {
-        let row = ctx.Conlang.AxisValue.Create()
-        row.Axis <- aid
-        row.Name <- av
-        try
-            ctx.SubmitUpdates()
-            let lid = query {
+        let lid =
+            query {
                 for a in ctx.Conlang.AxisName do
                 where (a.Id = aid)
                 select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            do!
+                query {
+                    for an in ctx.Conlang.AxisName do
+                    where (an.Id = aid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            lid |> map updateInflectTransformations |> ignore
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
-let putAxisValueHandler (logger : ILogger) avid av =
+let postAxisValueHandler (logger : ILogger) stoken aid av =
     async {
-        query {
-            for a in ctx.Conlang.AxisValue do
-            where (a.Id = avid)
-        } |> Seq.iter (fun a -> a.Name <- av)
-        try
-            ctx.SubmitUpdates()
-            let lid = query {
-                for av in ctx.Conlang.AxisValue do
-                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
-                where (av.Id = avid)
+        let lid =
+            query {
+                for a in ctx.Conlang.AxisName do
+                where (a.Id = aid)
                 select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            let row = ctx.Conlang.AxisValue.Create()
+            row.Axis <- aid
+            row.Name <- av
+            try
+                ctx.SubmitUpdates()
+                lid |> map updateInflectTransformations |> ignore
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
-let deleteAxisValueHandler (logger : ILogger) avid =
+let putAxisValueHandler (logger : ILogger) stoken avid av =
     async {
-        let! lid =
+        let lid =
             query {
                 for av in ctx.Conlang.AxisValue do
                 join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
                 where (av.Id = avid)
                 select a.Language
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        do!
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
             query {
                 for a in ctx.Conlang.AxisValue do
                 where (a.Id = avid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            } |> Seq.iter (fun a -> a.Name <- av)
+            try
+                ctx.SubmitUpdates()
+                lid |> map updateInflectTransformations |> ignore
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
+    }
+
+let deleteAxisValueHandler (logger : ILogger) stoken avid =
+    async {
+        let lid =
+            query {
+                for av in ctx.Conlang.AxisValue do
+                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                where (av.Id = avid)
+                select a.Language
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            do!
+                query {
+                    for a in ctx.Conlang.AxisValue do
+                    where (a.Id = avid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            lid |> map updateInflectTransformations |> ignore
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
 let getAxisRulesHandler (logger : ILogger) i avid : Map<int, Rule> Async =
@@ -133,93 +167,83 @@ let getAxisRulesHandler (logger : ILogger) i avid : Map<int, Rule> Async =
         return rules
     }
 
-let postAxisRulesHandler (logger : ILogger) i avid (rules : Rule list) =
+let postAxisRulesHandler (logger : ILogger) stoken i avid (rules : Rule list) =
     async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        for rule in rules do
-            let row = ctx.Conlang.Rule.Create()
-            row.Axis <- avid
-            row.Inflection <- i
-            row.Rule <- JsonSerializer.Serialize(rule, jsonOptions)
-            ctx.SubmitUpdates()
-
-        let lid = query {
-            for a in ctx.Conlang.AxisName do
-            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-            where (av.Id = avid)
-            select a.Language
-        }
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        transaction.Complete()
-    }
-
-let postAxisRuleHandler (logger : ILogger) i avid (rule : Rule) =
-    async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        do!
+        let lid =
             query {
-                for r in ctx.Conlang.Rule do
-                where (r.Axis = avid && r.Inflection = i)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        let row = ctx.Conlang.Rule.Create()
-        row.Axis <- avid
-        row.Inflection <- i
-        row.Rule <- JsonSerializer.Serialize(rule, jsonOptions)
-        ctx.SubmitUpdates()
+                for a in ctx.Conlang.AxisName do
+                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                where (av.Id = avid)
+                select a.Language
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            for rule in rules do
+                let row = ctx.Conlang.Rule.Create()
+                row.Axis <- avid
+                row.Inflection <- i
+                row.Rule <- JsonSerializer.Serialize(rule, jsonOptions)
+                ctx.SubmitUpdates()
 
-        let lid = query {
-            for a in ctx.Conlang.AxisName do
-            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-            where (av.Id = avid)
-            select a.Language
-        }
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-
-        transaction.Complete()
+            lid |> map updateInflectTransformations |> ignore
+            transaction.Complete()
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
-let putAxisRuleHandler (_ : ILogger) rid (rule : Rule) =
-    async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        query {
-            for r in ctx.Conlang.Rule do
-            where (r.Id = rid)
-        } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule, jsonOptions))
-        try
-            ctx.SubmitUpdates()
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
-        let lid = query {
-            for a in ctx.Conlang.AxisName do
-            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-            join r in ctx.Conlang.Rule on (av.Id = r.Axis)
-            where (r.Id = rid)
-            select a.Language
-        }
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        transaction.Complete()
-    }
 
-let deleteAxisRuleHandler (logger : ILogger) rid =
+let putAxisRuleHandler (logger : ILogger) stoken rid (rule : Rule) =
     async {
-        let! lid =
+        let lid =
             query {
                 for a in ctx.Conlang.AxisName do
                 join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
                 join r in ctx.Conlang.Rule on (av.Id = r.Axis)
                 where (r.Id = rid)
                 select a.Language
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        do!
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             query {
                 for r in ctx.Conlang.Rule do
                 where (r.Id = rid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule, jsonOptions))
+            try
+                ctx.SubmitUpdates()
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+
+            lid |> map updateInflectTransformations |> ignore
+            transaction.Complete()
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
+    }
+
+let deleteAxisRuleHandler (logger : ILogger) stoken rid =
+    async {
+        let lid =
+            query {
+                for a in ctx.Conlang.AxisName do
+                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                join r in ctx.Conlang.Rule on (av.Id = r.Axis)
+                where (r.Id = rid)
+                select a.Language
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            do!
+                query {
+                    for r in ctx.Conlang.Rule do
+                    where (r.Id = rid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            lid |> map updateInflectTransformations |> ignore
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
 let getInflectionsStructureHandler (logger : ILogger) lid =
@@ -297,110 +321,135 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
                                                                 |> map ignore
     }
 
-let putInflectionHandler (logger : ILogger) iid inflection =
+let putInflectionHandler (logger : ILogger) stoken iid inflection =
     async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-
-        do! rewriteInflectionRules logger iid inflection
-
-        do!
+        let lid =
             query {
-                for ic in ctx.Conlang.InflectionClass do
-                where (ic.Inflection = iid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        do!
-            query {
-                for ia in ctx.Conlang.InflectionAxes do
-                where (ia.Inflection = iid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-
-        for c in inflection.inflectionClasses do
-            let classRow = ctx.Conlang.InflectionClass.Create()
-            classRow.Class <- c
-            classRow.Inflection <- iid
-            ctx.SubmitUpdates()
-
-        for a in inflection.inflectionAxes do
-            let aRow = ctx.Conlang.InflectionAxes.Create()
-            aRow.Axis <- a
-            aRow.Inflection <- iid
-            ctx.SubmitUpdates()
-
-        query {
-            for i in ctx.Conlang.Inflection do
-            where (i.Id = iid)
-        } |> Seq.iter (fun i ->
-            i.SpeechPart <- inflection.inflectionSpeechPart
-            i.Name <- inflection.inflectionName
-        )
-        ctx.SubmitUpdates()
-
-        match inflection.inflectionAxes with
-        | [] -> ()
-        | aid::_ ->
-            let lid = query {
-                for a in ctx.Conlang.AxisName do
-                where (a.Id = aid)
+                for i in ctx.Conlang.Inflection do
+                join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
+                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
+                where (i.Id = iid)
                 select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
 
-        transaction.Complete()
+            do! rewriteInflectionRules logger iid inflection
+
+            do!
+                query {
+                    for ic in ctx.Conlang.InflectionClass do
+                    where (ic.Inflection = iid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            do!
+                query {
+                    for ia in ctx.Conlang.InflectionAxes do
+                    where (ia.Inflection = iid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+
+            for c in inflection.inflectionClasses do
+                let classRow = ctx.Conlang.InflectionClass.Create()
+                classRow.Class <- c
+                classRow.Inflection <- iid
+                ctx.SubmitUpdates()
+
+            for a in inflection.inflectionAxes do
+                let aRow = ctx.Conlang.InflectionAxes.Create()
+                aRow.Axis <- a
+                aRow.Inflection <- iid
+                ctx.SubmitUpdates()
+
+            query {
+                for i in ctx.Conlang.Inflection do
+                where (i.Id = iid)
+            } |> Seq.iter (fun i ->
+                i.SpeechPart <- inflection.inflectionSpeechPart
+                i.Name <- inflection.inflectionName
+            )
+            ctx.SubmitUpdates()
+
+            match inflection.inflectionAxes with
+            | [] -> ()
+            | aid::_ ->
+                let lid = query {
+                    for a in ctx.Conlang.AxisName do
+                    where (a.Id = aid)
+                    select a.Language
+                }
+                lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+
+            transaction.Complete()
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
-let postInflectionHandler (logger : ILogger) inflection =
+let postInflectionHandler (logger : ILogger) stoken inflection =
     async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let iRow = ctx.Conlang.Inflection.Create()
-        iRow.SpeechPart <- inflection.inflectionSpeechPart
-        iRow.Name <- inflection.inflectionName
-        ctx.SubmitUpdates()
-        let iId = ctx.Conlang.Inflection |> Seq.last
-
-        for a in inflection.inflectionAxes do
-            let aRow = ctx.Conlang.InflectionAxes.Create()
-            aRow.Axis <- a
-            aRow.Inflection <- iId.Id
-            ctx.SubmitUpdates()
-
-        for c in inflection.inflectionClasses do
-            let classRow = ctx.Conlang.InflectionClass.Create()
-            classRow.Class <- c
-            classRow.Inflection <- iId.Id
-            ctx.SubmitUpdates()
-
-        match inflection.inflectionAxes with
-        | [] -> ()
-        | aid::_ ->
-            let lid = query {
+        let lid =
+            query {
                 for a in ctx.Conlang.AxisName do
-                where (a.Id = aid)
+                where (a.Id |=| inflection.inflectionAxes)
                 select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            let iRow = ctx.Conlang.Inflection.Create()
+            iRow.SpeechPart <- inflection.inflectionSpeechPart
+            iRow.Name <- inflection.inflectionName
+            ctx.SubmitUpdates()
+            let iId = ctx.Conlang.Inflection |> Seq.last
 
-        transaction.Complete()
+            for a in inflection.inflectionAxes do
+                let aRow = ctx.Conlang.InflectionAxes.Create()
+                aRow.Axis <- a
+                aRow.Inflection <- iId.Id
+                ctx.SubmitUpdates()
+
+            for c in inflection.inflectionClasses do
+                let classRow = ctx.Conlang.InflectionClass.Create()
+                classRow.Class <- c
+                classRow.Inflection <- iId.Id
+                ctx.SubmitUpdates()
+
+            match inflection.inflectionAxes with
+            | [] -> ()
+            | aid::_ ->
+                let lid = query {
+                    for a in ctx.Conlang.AxisName do
+                    where (a.Id = aid)
+                    select a.Language
+                }
+                lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+
+            transaction.Complete()
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
-let deleteInflectionHandler (logger : ILogger) iid =
+let deleteInflectionHandler (logger : ILogger) stoken iid =
     async {
-        let! lid =
+        let lid =
             query {
                 for i in ctx.Conlang.Inflection do
                 join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
                 join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
                 select a.Language
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-
-        do!
-            query {
-                for i in ctx.Conlang.Inflection do
-                where (i.Id = iid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            do!
+                query {
+                    for i in ctx.Conlang.Inflection do
+                    where (i.Id = iid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            lid |> map updateInflectTransformations |> ignore
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
 let getOverrideRulesHandler (logger : ILogger) i lid =
@@ -424,121 +473,110 @@ let getOverrideRulesHandler (logger : ILogger) i lid =
         return groupedRules |> Map.ofList
     }
 
-let postOverrideRulesHandler (logger : ILogger) i rules =
+let postOverrideRulesHandler (logger : ILogger) stoken i rules =
     async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        do!
-            query {
-                for ro in ctx.Conlang.RuleOverride do
-                where (ro.Inflection = i)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        for rule in rules do
-            let row = ctx.Conlang.RuleOverride.Create()
-            row.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions)
-            row.Inflection <- i
-            ctx.SubmitUpdates()
+        let lid =
+            match rules with
+            | [] -> None
+            | rule::_ ->
+                match List.tryHead rule.overrideAxes with
+                | None -> None
+                | Some avid ->
+                    query {
+                        for a in ctx.Conlang.AxisName do
+                        join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                        where (av.Id = avid)
+                        select a.Language
+                    } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            do!
+                query {
+                    for ro in ctx.Conlang.RuleOverride do
+                    where (ro.Inflection = i)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            for rule in rules do
+                let row = ctx.Conlang.RuleOverride.Create()
+                row.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions)
+                row.Inflection <- i
+                ctx.SubmitUpdates()
 
-            let roId = ctx.Conlang.RuleOverride |> Seq.last
+                let roId = ctx.Conlang.RuleOverride |> Seq.last
+
+                for a in rule.overrideAxes do
+                    let aroRow = ctx.Conlang.AxesRuleOverride.Create()
+                    aroRow.RuleOverride <- roId.Id
+                    aroRow.AxisValue <- a
+                    ctx.SubmitUpdates()
+
+            lid |> map updateInflectTransformations |> ignore
+            transaction.Complete()
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
+    }
+
+let putOverrideRuleHandler (logger : ILogger) stoken rid rule =
+    async {
+        let lid =
+            match List.tryHead rule.overrideAxes with
+            | None -> None
+            | Some avid ->
+                query {
+                    for a in ctx.Conlang.AxisName do
+                    join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                    where (av.Id = avid)
+                    select a.Language
+                } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            do!
+                query {
+                    for oa in ctx.Conlang.AxesRuleOverride do
+                    where (oa.RuleOverride = rid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            query {
+                for r in ctx.Conlang.RuleOverride do
+                where (r.Id = rid)
+            } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions))
+            ctx.SubmitUpdates()
 
             for a in rule.overrideAxes do
                 let aroRow = ctx.Conlang.AxesRuleOverride.Create()
-                aroRow.RuleOverride <- roId.Id
+                aroRow.RuleOverride <- rid
                 aroRow.AxisValue <- a
                 ctx.SubmitUpdates()
 
-        match rules with
-        | [] -> ()
-        | rule::_ ->
-            let avid = List.head rule.overrideAxes
-            let lid = query {
-                for a in ctx.Conlang.AxisName do
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-                where (av.Id = avid)
-                select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        transaction.Complete()
+            lid |> map updateInflectTransformations |> ignore
+            transaction.Complete()
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
-let postOverrideRuleHandler (logger : ILogger) i rule =
+let deleteOverrideRuleHandler (logger : ILogger) stoken rid =
     async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let row = ctx.Conlang.RuleOverride.Create()
-        row.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions)
-        row.Inflection <- i
-        ctx.SubmitUpdates()
-
-        let roId = ctx.Conlang.RuleOverride |> Seq.last
-
-        for a in rule.overrideAxes do
-            let aroRow = ctx.Conlang.AxesRuleOverride.Create()
-            aroRow.RuleOverride <- roId.Id
-            aroRow.AxisValue <- a
-            ctx.SubmitUpdates()
-
-        let avid = List.head rule.overrideAxes
-        let lid = query {
-            for a in ctx.Conlang.AxisName do
-            join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-            where (av.Id = avid)
-            select a.Language
-        }
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        transaction.Complete()
-    }
-
-let putOverrideRuleHandler (logger : ILogger) rid rule =
-    async {
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        do!
-            query {
-                for oa in ctx.Conlang.AxesRuleOverride do
-                where (oa.RuleOverride = rid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        query {
-            for r in ctx.Conlang.RuleOverride do
-            where (r.Id = rid)
-        } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions))
-        ctx.SubmitUpdates()
-
-        for a in rule.overrideAxes do
-            let aroRow = ctx.Conlang.AxesRuleOverride.Create()
-            aroRow.RuleOverride <- rid
-            aroRow.AxisValue <- a
-            ctx.SubmitUpdates()
-
-        match List.tryHead rule.overrideAxes with
-        | None -> ()
-        | Some avid ->
-            let lid = query {
-                for a in ctx.Conlang.AxisName do
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-                where (av.Id = avid)
-                select a.Language
-            }
-            lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-        transaction.Complete()
-    }
-
-let deleteOverrideRuleHandler (logger : ILogger) rid =
-    async {
-        let! lid =
+        let lid =
             query {
                 for ro in ctx.Conlang.RuleOverride do
                 join aro in ctx.Conlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
                 join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
                 join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
                 select a.Language
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        do!
-            query {
-                for r in ctx.Conlang.RuleOverride do
-                where (r.Id = rid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-        lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+            } |> Seq.tryHead
+        let ouser = getUser logger stoken
+        match map (userHasLanguage ouser) lid with
+        | Some true ->
+            do!
+                query {
+                    for r in ctx.Conlang.RuleOverride do
+                    where (r.Id = rid)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+            lid |> map updateInflectTransformations |> ignore
+        | _ -> failwith $"user {ouser} does not own the language {lid}"
     }
 
 let getAxesHandler (logger : ILogger) lid =

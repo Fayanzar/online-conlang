@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Fable.Remoting.Giraffe" Version="5.14.0" />
+    <PackageReference Include="FSharp.Configuration" Version="2.0.0" />
     <PackageReference Include="FSharp.SystemTextJson" Version="1.1.23" />
     <PackageReference Include="FSharpPlus" Version="1.4.0" />
     <PackageReference Include="Giraffe" Version="5.0.0" />
@@ -28,7 +29,6 @@
     <Compile Include="Import\Phonotactics.fs" />
     <Compile Include="Import\Morphology.fs" />
     <Compile Include="Import\Term.fs" />
-    <Compile Include="Import\JsonWebToken.fs" />
     <Compile Include="Import\User.fs" />
     <Compile Include="Api\User.fs" />
     <Compile Include="Api\Phonemes.fs" />

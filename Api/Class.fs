@@ -3,90 +3,115 @@ module OnlineConlang.Api.Class
 open FSharpPlus
 
 open OnlineConlang.DB.Context
+open OnlineConlang.Import.User
 
 open FSharp.Data.Sql
 open Microsoft.Extensions.Logging
 
-let postClassHandler (logger : ILogger) lid c =
+let postClassHandler (logger : ILogger) stoken lid c =
     async {
-        let row = ctx.Conlang.ClassName.Create()
-        row.Language <- lid
-        row.Name <- c
-        try
-            ctx.SubmitUpdates()
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
-    }
-
-let putClassHandler (logger : ILogger) lid oldC newC =
-    async {
-        query {
-            for c in ctx.Conlang.ClassName do
-            where (c.Name = oldC && c.Language = lid)
-        } |> Seq.iter (fun c -> c.Name <- newC)
-        try
-            ctx.SubmitUpdates()
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
-    }
-let deleteClassHandler (logger : ILogger) lid cName =
-    async {
-        do!
-            query {
-                for c in ctx.Conlang.ClassName do
-                where (c.Language = lid && c.Name = cName)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-    }
-
-let postClassValueHandler (logger : ILogger) lid cn cv =
-    async {
-        let row = ctx.Conlang.ClassValue.Create()
-        row.Language <- lid
-        row.Class <- cn
-        row.Name <- cv
-        try
-            ctx.SubmitUpdates()
-        with
-        | e ->
-            ctx.ClearUpdates() |> ignore
-            failwith e.Message
-    }
-
-let putClassValueHandler (logger : ILogger) lid c oldCv newCv =
-    async {
-        let className = query {
-            for cn in ctx.Conlang.ClassName do
-            where (cn.Name = c && cn.Language = lid)
-            select (cn.Name)
-        }
-        match Seq.toList className with
-        | [] -> failwith "class name does not exist"
-        | cn::_ ->
-            query {
-                for cv in ctx.Conlang.ClassValue do
-                where (cv.Name = oldCv && cv.Language = lid && cv.Class = cn)
-            } |> Seq.iter (fun cv -> cv.Name <- newCv)
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            let row = ctx.Conlang.ClassName.Create()
+            row.Language <- lid
+            row.Name <- c
             try
                 ctx.SubmitUpdates()
             with
             | e ->
                 ctx.ClearUpdates() |> ignore
                 failwith e.Message
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }
 
-let deleteClassValueHandler (logger : ILogger) lid c cValue =
+let putClassHandler (logger : ILogger) stoken lid oldC newC =
     async {
-        do!
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
             query {
-                for cv in ctx.Conlang.ClassValue do
-                where (cv.Language = lid && cv.Name = cValue && cv.Class = c)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
+                for c in ctx.Conlang.ClassName do
+                where (c.Name = oldC && c.Language = lid)
+            } |> Seq.iter (fun c -> c.Name <- newC)
+            try
+                ctx.SubmitUpdates()
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+        else
+            failwith $"user {ouser} does not own the language {lid}"
+    }
+let deleteClassHandler (logger : ILogger) stoken lid cName =
+    async {
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            do!
+                query {
+                    for c in ctx.Conlang.ClassName do
+                    where (c.Language = lid && c.Name = cName)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+        else
+            failwith $"user {ouser} does not own the language {lid}"
+    }
+
+let postClassValueHandler (logger : ILogger) stoken lid cn cv =
+    async {
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            let row = ctx.Conlang.ClassValue.Create()
+            row.Language <- lid
+            row.Class <- cn
+            row.Name <- cv
+            try
+                ctx.SubmitUpdates()
+            with
+            | e ->
+                ctx.ClearUpdates() |> ignore
+                failwith e.Message
+        else
+            failwith $"user {ouser} does not own the language {lid}"
+    }
+
+let putClassValueHandler (logger : ILogger) stoken lid c oldCv newCv =
+    async {
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            let className = query {
+                for cn in ctx.Conlang.ClassName do
+                where (cn.Name = c && cn.Language = lid)
+                select (cn.Name)
+            }
+            match Seq.toList className with
+            | [] -> failwith "class name does not exist"
+            | cn::_ ->
+                query {
+                    for cv in ctx.Conlang.ClassValue do
+                    where (cv.Name = oldCv && cv.Language = lid && cv.Class = cn)
+                } |> Seq.iter (fun cv -> cv.Name <- newCv)
+                try
+                    ctx.SubmitUpdates()
+                with
+                | e ->
+                    ctx.ClearUpdates() |> ignore
+                    failwith e.Message
+        else
+            failwith $"user {ouser} does not own the language {lid}"
+    }
+
+let deleteClassValueHandler (logger : ILogger) stoken lid c cValue =
+    async {
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            do!
+                query {
+                    for cv in ctx.Conlang.ClassValue do
+                    where (cv.Language = lid && cv.Name = cValue && cv.Class = c)
+                } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                |> map ignore
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }
 
 let getClassesHandler (logger : ILogger) lid =

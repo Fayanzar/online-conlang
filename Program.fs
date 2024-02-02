@@ -9,11 +9,13 @@ open OnlineConlang.Api.Term
 open OnlineConlang.Api.Transcription
 open OnlineConlang.Api.Axes
 open OnlineConlang.Api.Phonemes
+open OnlineConlang.Api.User
 
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Morphology
 open OnlineConlang.Import.Phonotactics
 open OnlineConlang.Import.Phonology
+open OnlineConlang.Import.User
 
 open System
 open System.IO
@@ -88,6 +90,9 @@ type AuthenticationError =
    | UserDoesNotHaveAccess
 
 let server (logger : ILogger) : IServer = {
+    postLogin = postLoginUserHandler logger
+    postRegister = postRegisterUserHandler logger
+
     getLanguages = getLanguagesHandler logger
     deleteLanguage = deleteLanguageHandler logger
     postLanguage = postLanguageHandler logger
@@ -129,13 +134,11 @@ let server (logger : ILogger) : IServer = {
     deleteAxisValue = deleteAxisValueHandler logger
 
     getAxisRules = getAxisRulesHandler logger
-    postAxisRule = postAxisRuleHandler logger
     postAxisRules = postAxisRulesHandler logger
     putAxisRule = putAxisRuleHandler logger
     deleteAxisRule = deleteAxisRuleHandler logger
 
     getOverrideRules = getOverrideRulesHandler logger
-    postOverrideRule = postOverrideRuleHandler logger
     postOverrideRules = postOverrideRulesHandler logger
     putOverrideRule = putOverrideRuleHandler logger
     deleteOverrideRule = deleteOverrideRuleHandler logger
@@ -230,6 +233,8 @@ let main args =
     for lid in (Seq.toList languages) do
         updateInflectTransformations lid
         updatePhonemeClasses lid
+
+    updateUsersLanguages
 
     Host.CreateDefaultBuilder(args)
         .ConfigureWebHostDefaults(

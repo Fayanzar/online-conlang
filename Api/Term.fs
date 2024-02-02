@@ -8,131 +8,156 @@ open SharedModels
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.Term
 open OnlineConlang.Import.Morphology
+open OnlineConlang.Import.User
 
 open FSharp.Data.Sql
 open System.Text.Json
 open System.Transactions
 open Microsoft.Extensions.Logging
 
-let postTermHandler (logger : ILogger) lid termApi =
+let postTermHandler (logger : ILogger) stoken lid termApi =
     async {
-        let term = parseTerm termApi
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let! wordClasses =
-            query {
-                for cv in ctx.Conlang.ClassValue do
-                where (cv.Language = lid)
-                select cv.Name
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        let! partOfSpeech =
-            query {
-                for p in ctx.Conlang.SpeechPart do
-                where (p.Name = term.speechPart && p.Language = lid)
-                select p
-            } |> Seq.executeQueryAsync |> Async.AwaitTask
-        let newWordClasses = Set.intersect (Set wordClasses) term.wordClasses
-        if newWordClasses <> term.wordClasses then
-            transaction.Complete()
-            failwith "one of classes does not exist"
-        else
-            match toList partOfSpeech with
-            | [] ->
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            let term = parseTerm termApi
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            let! wordClasses =
+                query {
+                    for cv in ctx.Conlang.ClassValue do
+                    where (cv.Language = lid)
+                    select cv.Name
+                } |> Seq.executeQueryAsync |> Async.AwaitTask
+            let! partOfSpeech =
+                query {
+                    for p in ctx.Conlang.SpeechPart do
+                    where (p.Name = term.speechPart && p.Language = lid)
+                    select p
+                } |> Seq.executeQueryAsync |> Async.AwaitTask
+            let newWordClasses = Set.intersect (Set wordClasses) term.wordClasses
+            if newWordClasses <> term.wordClasses then
                 transaction.Complete()
-                failwith "part of speech does not exist"
-            | _  ->
-                let row = ctx.Conlang.Term.Create()
-                row.Word <- term.word
-                row.Language <- lid
-                row.SpeechPart <- Some term.speechPart
+                failwith "one of classes does not exist"
+            else
+                match toList partOfSpeech with
+                | [] ->
+                    transaction.Complete()
+                    failwith "part of speech does not exist"
+                | _  ->
+                    let row = ctx.Conlang.Term.Create()
+                    row.Word <- term.word
+                    row.Language <- lid
+                    row.SpeechPart <- Some term.speechPart
 
-                let transcription =
-                    match term.transcription with
-                    | None   -> term.mkTranscription lid
-                    | Some t -> t
+                    let transcription =
+                        match term.transcription with
+                        | None   -> term.mkTranscription lid
+                        | Some t -> t
 
-                let inflection =
-                    match term.inflection with
-                    | None   -> term.mkInflections lid
-                    | Some i -> i
+                    let inflection =
+                        match term.inflection with
+                        | None   -> term.mkInflections lid
+                        | Some i -> i
 
-                row.Transcription <- Some transcription
-                row.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
+                    row.Transcription <- Some transcription
+                    row.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
 
-                ctx.SubmitUpdates()
-
-                let tid = ctx.Conlang.Term |> Seq.last
-
-                for c in newWordClasses do
-                    let rowClass = ctx.Conlang.TermClass.Create()
-                    rowClass.Class <- c
-                    rowClass.Term <- tid.Id
                     ctx.SubmitUpdates()
 
-                transaction.Complete()
+                    let tid = ctx.Conlang.Term |> Seq.last
+
+                    for c in newWordClasses do
+                        let rowClass = ctx.Conlang.TermClass.Create()
+                        rowClass.Class <- c
+                        rowClass.Term <- tid.Id
+                        ctx.SubmitUpdates()
+
+                    transaction.Complete()
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }
 
-let deleteTermHandler (logger : ILogger) lid tid =
+let deleteTermHandler (logger : ILogger) stoken tid =
     async {
-        do!
+        let lid =
             query {
                 for t in ctx.Conlang.Term do
-                where (t.Id = tid && t.Language = lid)
-            } |> Seq.``delete all items from single table`` |> Async.AwaitTask
-                                                            |> map ignore
-    }
-
-let putTermHandler (logger : ILogger) lid tid termApi =
-    async {
-        let term = parseTerm termApi
-        use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-        let wordClasses =
-            query {
-                for cv in ctx.Conlang.ClassValue do
-                where (cv.Name |=| term.wordClasses && cv.Language = lid)
-                select (cv)
-            } |> Seq.toList
-        let partOfSpeech =
-            query {
-                for p in ctx.Conlang.SpeechPart do
-                where (p.Name = term.speechPart && p.Language = lid)
-                select (p)
-            } |> Seq.toList
-        match wordClasses, partOfSpeech with
-        | [], _ ->
-            transaction.Complete()
-            failwith "class does not exist"
-        | _, [] ->
-            transaction.Complete()
-            failwith "part of speech does not exist"
-        | _, _  ->
-            query {
-                for t in ctx.Conlang.Term do
-                where (t.Id = tid && t.Language = lid)
-            } |> Seq.iter (fun t ->
-                t.Word <- term.word
-                t.Language <- lid
-                t.SpeechPart <- Some term.speechPart
-                t.Transcription <- term.mkTranscription lid |> Some
-                t.Inflection <- Some <| JsonSerializer.Serialize(term.mkInflections lid, jsonOptions)
-            )
-            ctx.SubmitUpdates()
-
+                where (t.Id = tid)
+                select t.Language
+            } |> Seq.head
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
             do!
                 query {
-                    for tc in ctx.Conlang.TermClass do
-                    where (tc.Term = tid)
+                    for t in ctx.Conlang.Term do
+                    where (t.Id = tid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
+        else
+            failwith $"user {ouser} does not own the language {lid}"
+    }
 
-            wordClasses |> iter (
-                fun c ->
-                    let rowClass = ctx.Conlang.TermClass.Create()
-                    rowClass.Class <- c.Name
-                    rowClass.Term <- tid
-                    ctx.SubmitUpdates()
-            )
+let putTermHandler (logger : ILogger) stoken tid termApi =
+    async {
+        let term = parseTerm termApi
+        let lid =
+            query {
+                for t in ctx.Conlang.Term do
+                where (t.Id = tid)
+                select t.Language
+            } |> Seq.head
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
+            let wordClasses =
+                query {
+                    for cv in ctx.Conlang.ClassValue do
+                    where (cv.Name |=| term.wordClasses && cv.Language = lid)
+                    select (cv)
+                } |> Seq.toList
+            let partOfSpeech =
+                query {
+                    for p in ctx.Conlang.SpeechPart do
+                    where (p.Name = term.speechPart && p.Language = lid)
+                    select (p)
+                } |> Seq.toList
+            match wordClasses, partOfSpeech with
+            | [], _ ->
+                transaction.Complete()
+                failwith "class does not exist"
+            | _, [] ->
+                transaction.Complete()
+                failwith "part of speech does not exist"
+            | _, _  ->
+                query {
+                    for t in ctx.Conlang.Term do
+                    where (t.Id = tid && t.Language = lid)
+                } |> Seq.iter (fun t ->
+                    t.Word <- term.word
+                    t.Language <- lid
+                    t.SpeechPart <- Some term.speechPart
+                    t.Transcription <- term.mkTranscription lid |> Some
+                    t.Inflection <- Some <| JsonSerializer.Serialize(term.mkInflections lid, jsonOptions)
+                )
+                ctx.SubmitUpdates()
 
-            transaction.Complete()
+                do!
+                    query {
+                        for tc in ctx.Conlang.TermClass do
+                        where (tc.Term = tid)
+                    } |> Seq.``delete all items from single table`` |> Async.AwaitTask
+                                                                    |> map ignore
+
+                wordClasses |> iter (
+                    fun c ->
+                        let rowClass = ctx.Conlang.TermClass.Create()
+                        rowClass.Class <- c.Name
+                        rowClass.Term <- tid
+                        ctx.SubmitUpdates()
+                )
+
+                transaction.Complete()
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }
 
 let getTermsHandler (logger : ILogger) lid =
@@ -160,43 +185,53 @@ let getTermsHandler (logger : ILogger) lid =
         return termsResponse
     }
 
-let postRebuildInflectionsHandler (logger : ILogger) tid =
+let postRebuildInflectionsHandler (logger : ILogger) stoken tid =
     async {
-        let termWithClasses =
+        let lid =
             query {
                 for t in ctx.Conlang.Term do
-                join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
                 where (t.Id = tid)
-                select (t, tc.Class)
-            } |> Seq.toList
-        let term = termWithClasses |> List.head |> fst
-        let classes = termWithClasses |> map snd |> Set
-        query {
-            for t in ctx.Conlang.Term do
-            where (t.Id = tid)
-        } |> Seq.iter (fun t ->
-            match term.SpeechPart with
-            | Some speechPart ->
-                let inflections =
-                    inflectTransformations
-                    |> toList
-                    |> filter (fun a ->
-                        let (l, _) = a.Key
-                        let (_, sp, classes', _) = a.Value
-                        sp = speechPart
-                        && Set.isSubset classes classes'
-                        && l = term.Language
-                    ) |> map (fun i -> i.Value)
-                let axesWithNames = inflections |> map (fun (name, _, _, axes) -> (name, axes))
-                let inflection = axesWithNames |> map (fun (name, axes) ->
-                    logger.LogInformation(axes.ToString())
-                    let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
-                    (name,
-                    ( axes.axes |> List.map (fun a -> a.name)
-                    , map (fun names -> (names, inflect term.Word axes names)) allNames))
-                )
-                t.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
-            | _ -> ()
-        )
-        ctx.SubmitUpdates()
+                select t.Language
+            } |> Seq.head
+        let ouser = getUser logger stoken
+        if userHasLanguage ouser lid then
+            let termWithClasses =
+                query {
+                    for t in ctx.Conlang.Term do
+                    join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
+                    where (t.Id = tid)
+                    select (t, tc.Class)
+                } |> Seq.toList
+            let term = termWithClasses |> List.head |> fst
+            let classes = termWithClasses |> map snd |> Set
+            query {
+                for t in ctx.Conlang.Term do
+                where (t.Id = tid)
+            } |> Seq.iter (fun t ->
+                match term.SpeechPart with
+                | Some speechPart ->
+                    let inflections =
+                        inflectTransformations
+                        |> toList
+                        |> filter (fun a ->
+                            let (l, _) = a.Key
+                            let (_, sp, classes', _) = a.Value
+                            sp = speechPart
+                            && Set.isSubset classes classes'
+                            && l = term.Language
+                        ) |> map (fun i -> i.Value)
+                    let axesWithNames = inflections |> map (fun (name, _, _, axes) -> (name, axes))
+                    let inflection = axesWithNames |> map (fun (name, axes) ->
+                        logger.LogInformation(axes.ToString())
+                        let allNames = map (fun a -> a.inflections.Keys |> toList) axes.axes |> cartesian
+                        (name,
+                        ( axes.axes |> List.map (fun a -> a.name)
+                        , map (fun names -> (names, inflect term.Word axes names)) allNames))
+                    )
+                    t.Inflection <- Some <| JsonSerializer.Serialize(inflection, jsonOptions)
+                | _ -> ()
+            )
+            ctx.SubmitUpdates()
+        else
+            failwith $"user {ouser} does not own the language {lid}"
     }

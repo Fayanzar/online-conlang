@@ -1,0 +1,6 @@
+jwt:
+    issuer: https://disney.com
+    audience: https://localhost:5001
+    secret: amF2YWludXNlLXNlY3JldC1rZXk=
+db:
+    connectionString: "Server=localhost;Database=conlang;User=root;Password=password"
