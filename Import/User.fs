@@ -29,7 +29,7 @@ let userLanguages = new Dictionary<int, list<int>>()
 
 let updateUserLanguages uid langs =
     if userLanguages.ContainsKey uid then
-        (userLanguages.Item uid) <- langs
+        userLanguages.Item uid <- langs
     else
         userLanguages.Add(uid, langs)
 
