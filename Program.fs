@@ -92,6 +92,7 @@ type AuthenticationError =
 let server (logger : ILogger) : IServer = {
     postLogin = postLoginUserHandler logger
     postRegister = postRegisterUserHandler logger
+    getVerifyUser = getVerifyUserHandler logger
 
     getLanguages = getLanguagesHandler logger
     deleteLanguage = deleteLanguageHandler logger
@@ -242,6 +243,7 @@ let main args =
                 webHostBuilder
                     .UseContentRoot(contentRoot)
                     .UseWebRoot(webRoot)
+                    .UseUrls("https://localhost:5001")
                     .Configure(Action<IApplicationBuilder> configureApp)
                     .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)

@@ -13,7 +13,7 @@ open Microsoft.Extensions.Logging
 open System
 open System.Security.Claims;
 
-let postRegisterUserHandler (logger : ILogger) loginInfo : Async<unit> =
+let postRegisterUserHandler (logger : ILogger) loginInfo email : Async<unit> =
     async {
         let username = loginInfo.username
         let password = loginInfo.password
@@ -29,11 +29,20 @@ let postRegisterUserHandler (logger : ILogger) loginInfo : Async<unit> =
 
         if Option.isSome userExists then
             failwith "user with such username already exists, try another username"
-        else
+        else if validateEmail email then
+            use md5 = Security.Cryptography.MD5.Create()
+            let inputBytes = Text.Encoding.UTF8.GetBytes username
+            let hashbytes = md5.ComputeHash inputBytes
+            let hash = Convert.ToHexString hashbytes
+
             let row = ctx.Conlang.User.Create()
             row.Login <- username
             row.Password <- hashedPassword
+            row.Email <- email
+            row.VerificationKey <- Some hash
             ctx.SubmitUpdates()
+        else
+            failwith $"{email} is not a valid email"
     }
 
 let postLoginUserHandler (logger : ILogger) loginInfo : Async<SecurityToken> =
@@ -76,4 +85,23 @@ let postLoginUserHandler (logger : ILogger) loginInfo : Async<SecurityToken> =
                                 (Nullable())
                                 (Nullable())
                 return SecurityToken token
+    }
+
+let getVerifyUserHandler (logger : ILogger) username verificationKey =
+    async {
+        let ouser =
+            query {
+                for u in ctx.Conlang.User do
+                where (u.Login = username && u.VerificationKey = Some verificationKey)
+                select u
+            } |> Seq.tryHead
+        match ouser with
+        | None -> failwith "username or verification key incorrect"
+        | Some user -> 
+            if toBool user.Verified then
+                failwith "user is already verified"
+            else
+                user.Verified <- fromBool true
+                user.VerificationKey <- None
+                ctx.SubmitUpdates()
     }

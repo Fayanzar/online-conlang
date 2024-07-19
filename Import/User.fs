@@ -12,7 +12,9 @@ open Microsoft.IdentityModel.Tokens;
 open System.Collections.Generic
 open System.IdentityModel.Tokens.Jwt;
 open System.Security.Claims;
+open System.Globalization;
 open System.Text;
+open System.Text.RegularExpressions;
 open System
 
 type IJWTHandler =
@@ -113,3 +115,24 @@ let userHasLanguage ouser lang =
             let langs = userLanguages.Item uid
             List.contains lang langs
         else false
+
+let sendEmail email body = ()
+
+let sendVerificationEmail email = ()
+
+let validateEmail email =
+    if String.IsNullOrWhiteSpace(email) then false
+    else
+        try
+            let domainMapper (m : Match) =
+                let idn = new IdnMapping()
+                let domainName = idn.GetAscii m.Groups[2].Value
+                m.Groups[1].Value + domainName
+
+            let normalizedEmail = Regex.Replace(email, @"(@)(.+)$", domainMapper,
+                                      RegexOptions.None, TimeSpan.FromMilliseconds(200))
+            Regex.IsMatch(normalizedEmail,
+                @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+                RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(250))
+        with 
+        | _ -> false

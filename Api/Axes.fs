@@ -20,15 +20,24 @@ let postAxisNameHandler (logger : ILogger) stoken lid an =
     async {
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
-            let row = ctx.Conlang.AxisName.Create()
-            row.Language <- lid
-            row.Name <- an
-            try
-                ctx.SubmitUpdates()
-            with
-            | e ->
-                ctx.ClearUpdates() |> ignore
-                failwith e.Message
+            let axesWithName =
+                query {
+                    for a in ctx.Conlang.AxisName do
+                    where (a.Name = an && a.Language = lid)
+                    select (a.Name)
+                } |> Seq.toList
+            if not (axesWithName = []) then
+                failwith $"axis with name {an} already exists"
+            else 
+                let row = ctx.Conlang.AxisName.Create()
+                row.Language <- lid
+                row.Name <- an
+                try
+                    ctx.SubmitUpdates()
+                with
+                | e ->
+                    ctx.ClearUpdates() |> ignore
+                    failwith e.Message
         else
             failwith $"user {ouser} does not own the language {lid}"
     }
@@ -43,22 +52,31 @@ let putAxisNameHandler (logger : ILogger) stoken aid an =
             } |> Seq.head
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
-            query {
-                for a in ctx.Conlang.AxisName do
-                where (a.Id = aid)
-            } |> Seq.iter (fun a -> a.Name <- an)
-            try
-                ctx.SubmitUpdates()
-                let lid = query {
-                        for a in ctx.Conlang.AxisName do
-                        where (a.Id = aid)
-                        select a.Language
-                }
-                lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
-            with
-            | e ->
-                ctx.ClearUpdates() |> ignore
-                failwith e.Message
+            let axesWithName =
+                query {
+                    for a in ctx.Conlang.AxisName do
+                    where (a.Name = an && a.Language = lid)
+                    select (a.Name)
+                } |> Seq.toList
+            if not (axesWithName = []) then
+                failwith $"axis with name {an} already exists"
+            else
+                query {
+                    for a in ctx.Conlang.AxisName do
+                    where (a.Id = aid)
+                } |> Seq.iter (fun a -> a.Name <- an)
+                try
+                    ctx.SubmitUpdates()
+                    let lid = query {
+                            for a in ctx.Conlang.AxisName do
+                            where (a.Id = aid)
+                            select a.Language
+                    }
+                    lid |> Seq.tryHead |> map updateInflectTransformations |> ignore
+                with
+                | e ->
+                    ctx.ClearUpdates() |> ignore
+                    failwith e.Message
         else
             failwith $"user {ouser} does not own the language {lid}"
     }
@@ -591,7 +609,7 @@ let getAxesHandler (logger : ILogger) lid =
         let resp = groupedAxes |> Seq.map (fun (k, v) ->
             let aId = fst k
             let aName = snd k
-            let aValues = v |> Seq.toList |> map snd |> List.filter (fun (avid, _) -> avid <> 0)
+            let aValues = v |> Seq.toList |> map snd |> List.filter (fst >> ((<>) 0))
             { id = aId; name = aName; values = aValues }
         )
         return resp

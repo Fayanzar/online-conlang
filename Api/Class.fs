@@ -118,11 +118,13 @@ let getClassesHandler (logger : ILogger) lid =
     async {
         let! classes =
             query {
-                for cv in ctx.Conlang.ClassValue do
-                join cn in ctx.Conlang.ClassName on ((cv.Class, cv.Language) = (cn.Name, cn.Language))
+                for cn in ctx.Conlang.ClassName do
+                join cv in !!ctx.Conlang.ClassValue on ((cn.Name, cn.Language) = (cv.Class, cv.Language))
                 where (cn.Language = lid)
                 select (cn.Name, cv.Name)
             } |> Seq.executeQueryAsync |> Async.AwaitTask
-        let classMap = classes |> Seq.groupBy fst |> map (fun (k, v) -> (k, map snd v))
+        let classMap = classes 
+                    |> Seq.groupBy fst 
+                    |> map (fun (k, v) -> (k, map snd v |> filter ((<>) "")))
         return Map classMap
     }
