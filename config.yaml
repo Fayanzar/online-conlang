@@ -1,6 +1,14 @@
+baseExternalUrl: https://localhost:5173
 jwt:
     issuer: https://disney.com
     audience: https://localhost:5001
     secret: fcrvBbXi1Aimu6sIiZMlcvIP9CqjYjVd
 db:
     connectionString: "Server=localhost;Database=conlang;User=root;Password=password"
+mail:
+    smtpClient: mail.marraidh.com
+    smtpPort: 465
+    fromName: Marràidh Support
+    from: marraidh@marraidh.com
+    user: marraidh
+    password: not_telling

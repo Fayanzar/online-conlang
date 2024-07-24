@@ -91,8 +91,12 @@ type AuthenticationError =
 
 let server (logger : ILogger) : IServer = {
     postLogin = postLoginUserHandler logger
+    postLogout = postLogoutUserHandler logger
     postRegister = postRegisterUserHandler logger
-    getVerifyUser = getVerifyUserHandler logger
+    postVerifyUser = postVerifyUserHandler logger
+    postSendVerificationEmail = postSendVerificationEmailHandler logger
+
+    getUser = getUserHandler logger
 
     getLanguages = getLanguagesHandler logger
     deleteLanguage = deleteLanguageHandler logger

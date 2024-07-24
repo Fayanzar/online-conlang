@@ -7,14 +7,16 @@ open OnlineConlang.Foundation
 
 open OnlineConlang.DB.Context
 
+open MailKit.Net.Smtp
+open MimeKit
 open Microsoft.Extensions.Logging
-open Microsoft.IdentityModel.Tokens;
+open Microsoft.IdentityModel.Tokens
 open System.Collections.Generic
-open System.IdentityModel.Tokens.Jwt;
-open System.Security.Claims;
-open System.Globalization;
-open System.Text;
-open System.Text.RegularExpressions;
+open System.IdentityModel.Tokens.Jwt
+open System.Security.Claims
+open System.Globalization
+open System.Text
+open System.Text.RegularExpressions
 open System
 
 type IJWTHandler =
@@ -116,9 +118,41 @@ let userHasLanguage ouser lang =
             List.contains lang langs
         else false
 
-let sendEmail email body = ()
+let sendEmail email subject body =
+    let message = new MimeMessage ()
+    message.From.Add <| new MailboxAddress (config.mail.fromName, config.mail.from)
+    message.To.Add <| new MailboxAddress ("", email)
+    message.Subject <- subject
+    let messageBody = new TextPart "html"
+    messageBody.Text <- body
+    message.Body <- messageBody
+    use client = new SmtpClient ()
+    client.Connect (config.mail.smtpClient, config.mail.smtpPort, true)
+    client.Authenticate (config.mail.user, config.mail.password)
+    client.Send message |> ignore
+    client.Disconnect true
 
-let sendVerificationEmail email = ()
+let sendVerificationEmail username =
+    let subject = "Verify your email"
+    let oemailAndKey =
+        query {
+            for u in ctx.Conlang.User do
+            where (u.Login = username)
+            select (u.Email, u.VerificationKey)
+        } |> Seq.tryHead
+    match oemailAndKey with
+    | None -> failwith "no such user"
+    | Some (email, Some key) ->
+        let link = Uri(config.baseExternalUrl, $"/verify?username={username}&key={key}")
+        let body =
+            $"<h2>Hello, {username}!</h2>
+            <p>Thanks for registering at Marràidh Conlanging.
+            To be able to create and edit languages,
+            please click the verification link below.</p>
+            <p>{link}</p>
+            "
+        sendEmail email subject body
+    | _ -> failwith "verification key not found"
 
 let validateEmail email =
     if String.IsNullOrWhiteSpace(email) then false
@@ -134,5 +168,5 @@ let validateEmail email =
             Regex.IsMatch(normalizedEmail,
                 @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
                 RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(250))
-        with 
+        with
         | _ -> false

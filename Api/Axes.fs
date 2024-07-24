@@ -28,7 +28,7 @@ let postAxisNameHandler (logger : ILogger) stoken lid an =
                 } |> Seq.toList
             if not (axesWithName = []) then
                 failwith $"axis with name {an} already exists"
-            else 
+            else
                 let row = ctx.Conlang.AxisName.Create()
                 row.Language <- lid
                 row.Name <- an

@@ -123,8 +123,8 @@ let getClassesHandler (logger : ILogger) lid =
                 where (cn.Language = lid)
                 select (cn.Name, cv.Name)
             } |> Seq.executeQueryAsync |> Async.AwaitTask
-        let classMap = classes 
-                    |> Seq.groupBy fst 
+        let classMap = classes
+                    |> Seq.groupBy fst
                     |> map (fun (k, v) -> (k, map snd v |> filter ((<>) "")))
         return Map classMap
     }
