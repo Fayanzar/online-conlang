@@ -136,7 +136,9 @@ let putTermHandler (logger : ILogger) stoken tid termApi =
                     t.Language <- lid
                     t.SpeechPart <- Some term.speechPart
                     t.Transcription <- term.mkTranscription lid |> Some
-                    t.Inflection <- Some <| JsonSerializer.Serialize(term.mkInflections lid, jsonOptions)
+                    t.Inflection <- term.inflection |> Option.map (fun inf ->
+                        JsonSerializer.Serialize(inf, jsonOptions)
+                    )
                 )
                 ctx.SubmitUpdates()
 

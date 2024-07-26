@@ -339,6 +339,32 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
                                                                 |> map ignore
     }
 
+let checkInflectionData (logger : ILogger) lid inflection =
+    let classes =
+        query {
+            for c in ctx.Conlang.ClassValue do
+            where (c.Name |=| inflection.inflectionClasses && c.Language = lid)
+            select c.Name
+        } |> Set
+    let axes =
+        query {
+            for an in ctx.Conlang.AxisName do
+            where (an.Id |=| inflection.inflectionAxes && an.Language = lid)
+            select an.Id
+        } |> Set
+    let partOfSpeech =
+        query {
+            for sp in ctx.Conlang.SpeechPart do
+            where (sp.Name = inflection.inflectionSpeechPart && sp.Language = lid)
+            select sp.Name
+        } |> Seq.tryHead
+
+    let badClasses = Set.difference (Set inflection.inflectionClasses) classes
+    let badAxes = Set.difference (Set inflection.inflectionAxes) axes
+    if Option.isNone partOfSpeech then failwith $"bad part of speech: {inflection.inflectionSpeechPart}"
+    if not badClasses.IsEmpty then failwith $"bad classes: {badClasses}"
+    if not badAxes.IsEmpty then failwith $"bad axes: {badAxes}"
+
 let putInflectionHandler (logger : ILogger) stoken iid inflection =
     async {
         let lid =
@@ -349,13 +375,15 @@ let putInflectionHandler (logger : ILogger) stoken iid inflection =
                 where (i.Id = iid)
                 select a.Language
             } |> Seq.tryHead
+        if Option.isNone lid then failwith "language does not exist: {lid}"
         let ouser = getUser logger stoken
         match map (userHasLanguage ouser) lid with
         | Some true ->
+            checkInflectionData logger (Option.defaultValue 0 lid) inflection
+
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
 
             do! rewriteInflectionRules logger iid inflection
-
             do!
                 query {
                     for ic in ctx.Conlang.InflectionClass do
@@ -368,19 +396,16 @@ let putInflectionHandler (logger : ILogger) stoken iid inflection =
                     where (ia.Inflection = iid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
-
             for c in inflection.inflectionClasses do
                 let classRow = ctx.Conlang.InflectionClass.Create()
                 classRow.Class <- c
                 classRow.Inflection <- iid
                 ctx.SubmitUpdates()
-
             for a in inflection.inflectionAxes do
                 let aRow = ctx.Conlang.InflectionAxes.Create()
                 aRow.Axis <- a
                 aRow.Inflection <- iid
                 ctx.SubmitUpdates()
-
             query {
                 for i in ctx.Conlang.Inflection do
                 where (i.Id = iid)
@@ -412,9 +437,12 @@ let postInflectionHandler (logger : ILogger) stoken inflection =
                 where (a.Id |=| inflection.inflectionAxes)
                 select a.Language
             } |> Seq.tryHead
+        if Option.isNone lid then failwith "language does not exist: {lid}"
         let ouser = getUser logger stoken
         match map (userHasLanguage ouser) lid with
         | Some true ->
+            checkInflectionData logger (Option.defaultValue 0 lid) inflection
+
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             let iRow = ctx.Conlang.Inflection.Create()
             iRow.SpeechPart <- inflection.inflectionSpeechPart
