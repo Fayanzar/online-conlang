@@ -13,7 +13,7 @@ let postSpeechPartHandler (logger : ILogger) stoken lid sp =
     async {
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
-            let row = ctx.Conlang.SpeechPart.Create()
+            let row = ctx.MarraidhConlang.SpeechPart.Create()
             row.Language <- lid
             row.Name <- sp
             try
@@ -47,7 +47,7 @@ let deleteSpeechPartHandler (logger : ILogger) stoken lid spName =
         if userHasLanguage ouser lid then
             do!
                 query {
-                    for sp in ctx.Conlang.SpeechPart do
+                    for sp in ctx.MarraidhConlang.SpeechPart do
                     where (sp.Language = lid && sp.Name = spName)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -59,7 +59,7 @@ let getSpeechPartsHandler (logger : ILogger) lid =
     async {
         let! parts =
             query {
-                for sp in ctx.Conlang.SpeechPart do
+                for sp in ctx.MarraidhConlang.SpeechPart do
                 where (sp.Language = lid)
                 select sp.Name
             } |> Seq.executeQueryAsync |> Async.AwaitTask

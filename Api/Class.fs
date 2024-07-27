@@ -12,7 +12,7 @@ let postClassHandler (logger : ILogger) stoken lid c =
     async {
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
-            let row = ctx.Conlang.ClassName.Create()
+            let row = ctx.MarraidhConlang.ClassName.Create()
             row.Language <- lid
             row.Name <- c
             try
@@ -30,7 +30,7 @@ let putClassHandler (logger : ILogger) stoken lid oldC newC =
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
             query {
-                for c in ctx.Conlang.ClassName do
+                for c in ctx.MarraidhConlang.ClassName do
                 where (c.Name = oldC && c.Language = lid)
             } |> Seq.iter (fun c -> c.Name <- newC)
             try
@@ -48,7 +48,7 @@ let deleteClassHandler (logger : ILogger) stoken lid cName =
         if userHasLanguage ouser lid then
             do!
                 query {
-                    for c in ctx.Conlang.ClassName do
+                    for c in ctx.MarraidhConlang.ClassName do
                     where (c.Language = lid && c.Name = cName)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -60,7 +60,7 @@ let postClassValueHandler (logger : ILogger) stoken lid cn cv =
     async {
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
-            let row = ctx.Conlang.ClassValue.Create()
+            let row = ctx.MarraidhConlang.ClassValue.Create()
             row.Language <- lid
             row.Class <- cn
             row.Name <- cv
@@ -79,7 +79,7 @@ let putClassValueHandler (logger : ILogger) stoken lid c oldCv newCv =
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
             let className = query {
-                for cn in ctx.Conlang.ClassName do
+                for cn in ctx.MarraidhConlang.ClassName do
                 where (cn.Name = c && cn.Language = lid)
                 select (cn.Name)
             }
@@ -87,7 +87,7 @@ let putClassValueHandler (logger : ILogger) stoken lid c oldCv newCv =
             | [] -> failwith "class name does not exist"
             | cn::_ ->
                 query {
-                    for cv in ctx.Conlang.ClassValue do
+                    for cv in ctx.MarraidhConlang.ClassValue do
                     where (cv.Name = oldCv && cv.Language = lid && cv.Class = cn)
                 } |> Seq.iter (fun cv -> cv.Name <- newCv)
                 try
@@ -106,7 +106,7 @@ let deleteClassValueHandler (logger : ILogger) stoken lid c cValue =
         if userHasLanguage ouser lid then
             do!
                 query {
-                    for cv in ctx.Conlang.ClassValue do
+                    for cv in ctx.MarraidhConlang.ClassValue do
                     where (cv.Language = lid && cv.Name = cValue && cv.Class = c)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -118,8 +118,8 @@ let getClassesHandler (logger : ILogger) lid =
     async {
         let! classes =
             query {
-                for cn in ctx.Conlang.ClassName do
-                join cv in !!ctx.Conlang.ClassValue on ((cn.Name, cn.Language) = (cv.Class, cv.Language))
+                for cn in ctx.MarraidhConlang.ClassName do
+                join cv in !!ctx.MarraidhConlang.ClassValue on ((cn.Name, cn.Language) = (cv.Class, cv.Language))
                 where (cn.Language = lid)
                 select (cn.Name, cv.Name)
             } |> Seq.executeQueryAsync |> Async.AwaitTask

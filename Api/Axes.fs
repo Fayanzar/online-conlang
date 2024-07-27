@@ -22,14 +22,14 @@ let postAxisNameHandler (logger : ILogger) stoken lid an =
         if userHasLanguage ouser lid then
             let axesWithName =
                 query {
-                    for a in ctx.Conlang.AxisName do
+                    for a in ctx.MarraidhConlang.AxisName do
                     where (a.Name = an && a.Language = lid)
                     select (a.Name)
                 } |> Seq.toList
             if not (axesWithName = []) then
                 failwith $"axis with name {an} already exists"
             else
-                let row = ctx.Conlang.AxisName.Create()
+                let row = ctx.MarraidhConlang.AxisName.Create()
                 row.Language <- lid
                 row.Name <- an
                 try
@@ -46,7 +46,7 @@ let putAxisNameHandler (logger : ILogger) stoken aid an =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
+                for a in ctx.MarraidhConlang.AxisName do
                 where (a.Id = aid)
                 select a.Language
             } |> Seq.head
@@ -54,7 +54,7 @@ let putAxisNameHandler (logger : ILogger) stoken aid an =
         if userHasLanguage ouser lid then
             let axesWithName =
                 query {
-                    for a in ctx.Conlang.AxisName do
+                    for a in ctx.MarraidhConlang.AxisName do
                     where (a.Name = an && a.Language = lid)
                     select (a.Name)
                 } |> Seq.toList
@@ -62,13 +62,13 @@ let putAxisNameHandler (logger : ILogger) stoken aid an =
                 failwith $"axis with name {an} already exists"
             else
                 query {
-                    for a in ctx.Conlang.AxisName do
+                    for a in ctx.MarraidhConlang.AxisName do
                     where (a.Id = aid)
                 } |> Seq.iter (fun a -> a.Name <- an)
                 try
                     ctx.SubmitUpdates()
                     let lid = query {
-                            for a in ctx.Conlang.AxisName do
+                            for a in ctx.MarraidhConlang.AxisName do
                             where (a.Id = aid)
                             select a.Language
                     }
@@ -85,7 +85,7 @@ let deleteAxisNameHandler (logger : ILogger) stoken aid =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
+                for a in ctx.MarraidhConlang.AxisName do
                 where (a.Id = aid)
                 select a.Language
             } |> Seq.tryHead
@@ -94,7 +94,7 @@ let deleteAxisNameHandler (logger : ILogger) stoken aid =
         | Some true ->
             do!
                 query {
-                    for an in ctx.Conlang.AxisName do
+                    for an in ctx.MarraidhConlang.AxisName do
                     where (an.Id = aid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -106,14 +106,14 @@ let postAxisValueHandler (logger : ILogger) stoken aid av =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
+                for a in ctx.MarraidhConlang.AxisName do
                 where (a.Id = aid)
                 select a.Language
             } |> Seq.tryHead
         let ouser = getUser logger stoken
         match map (userHasLanguage ouser) lid with
         | Some true ->
-            let row = ctx.Conlang.AxisValue.Create()
+            let row = ctx.MarraidhConlang.AxisValue.Create()
             row.Axis <- aid
             row.Name <- av
             try
@@ -130,8 +130,8 @@ let putAxisValueHandler (logger : ILogger) stoken avid av =
     async {
         let lid =
             query {
-                for av in ctx.Conlang.AxisValue do
-                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                for av in ctx.MarraidhConlang.AxisValue do
+                join a in ctx.MarraidhConlang.AxisName on (av.Axis = a.Id)
                 where (av.Id = avid)
                 select a.Language
             } |> Seq.tryHead
@@ -139,7 +139,7 @@ let putAxisValueHandler (logger : ILogger) stoken avid av =
         match map (userHasLanguage ouser) lid with
         | Some true ->
             query {
-                for a in ctx.Conlang.AxisValue do
+                for a in ctx.MarraidhConlang.AxisValue do
                 where (a.Id = avid)
             } |> Seq.iter (fun a -> a.Name <- av)
             try
@@ -156,8 +156,8 @@ let deleteAxisValueHandler (logger : ILogger) stoken avid =
     async {
         let lid =
             query {
-                for av in ctx.Conlang.AxisValue do
-                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                for av in ctx.MarraidhConlang.AxisValue do
+                join a in ctx.MarraidhConlang.AxisName on (av.Axis = a.Id)
                 where (av.Id = avid)
                 select a.Language
             } |> Seq.tryHead
@@ -166,7 +166,7 @@ let deleteAxisValueHandler (logger : ILogger) stoken avid =
         | Some true ->
             do!
                 query {
-                    for a in ctx.Conlang.AxisValue do
+                    for a in ctx.MarraidhConlang.AxisValue do
                     where (a.Id = avid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -178,7 +178,7 @@ let getAxisRulesHandler (logger : ILogger) i avid : Map<int, Rule> Async =
     async {
         let rules =
             query {
-                for r in ctx.Conlang.Rule do
+                for r in ctx.MarraidhConlang.Rule do
                 where (r.Axis = avid && r.Inflection = i)
                 select (r.Id, r.Rule)
             } |> Seq.map (fun (k, r) -> (k, JsonSerializer.Deserialize(r, jsonOptions))) |> Map.ofSeq
@@ -189,8 +189,8 @@ let postAxisRulesHandler (logger : ILogger) stoken i avid (rules : Rule list) =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                for a in ctx.MarraidhConlang.AxisName do
+                join av in ctx.MarraidhConlang.AxisValue on (a.Id = av.Axis)
                 where (av.Id = avid)
                 select a.Language
             } |> Seq.tryHead
@@ -199,7 +199,7 @@ let postAxisRulesHandler (logger : ILogger) stoken i avid (rules : Rule list) =
         | Some true ->
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             for rule in rules do
-                let row = ctx.Conlang.Rule.Create()
+                let row = ctx.MarraidhConlang.Rule.Create()
                 row.Axis <- avid
                 row.Inflection <- i
                 row.Rule <- JsonSerializer.Serialize(rule, jsonOptions)
@@ -215,9 +215,9 @@ let putAxisRuleHandler (logger : ILogger) stoken rid (rule : Rule) =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-                join r in ctx.Conlang.Rule on (av.Id = r.Axis)
+                for a in ctx.MarraidhConlang.AxisName do
+                join av in ctx.MarraidhConlang.AxisValue on (a.Id = av.Axis)
+                join r in ctx.MarraidhConlang.Rule on (av.Id = r.Axis)
                 where (r.Id = rid)
                 select a.Language
             } |> Seq.tryHead
@@ -226,7 +226,7 @@ let putAxisRuleHandler (logger : ILogger) stoken rid (rule : Rule) =
         | Some true ->
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             query {
-                for r in ctx.Conlang.Rule do
+                for r in ctx.MarraidhConlang.Rule do
                 where (r.Id = rid)
             } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule, jsonOptions))
             try
@@ -245,9 +245,9 @@ let deleteAxisRuleHandler (logger : ILogger) stoken rid =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-                join r in ctx.Conlang.Rule on (av.Id = r.Axis)
+                for a in ctx.MarraidhConlang.AxisName do
+                join av in ctx.MarraidhConlang.AxisValue on (a.Id = av.Axis)
+                join r in ctx.MarraidhConlang.Rule on (av.Id = r.Axis)
                 where (r.Id = rid)
                 select a.Language
             } |> Seq.tryHead
@@ -256,7 +256,7 @@ let deleteAxisRuleHandler (logger : ILogger) stoken rid =
         | Some true ->
             do!
                 query {
-                    for r in ctx.Conlang.Rule do
+                    for r in ctx.MarraidhConlang.Rule do
                     where (r.Id = rid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -268,11 +268,11 @@ let getInflectionsStructureHandler (logger : ILogger) lid =
     async {
         let inflections =
             query {
-                for i in ctx.Conlang.Inflection do
-                join ic in ctx.Conlang.InflectionClass on (i.Id = ic.Inflection)
-                join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
-                join sp in ctx.Conlang.SpeechPart on (i.SpeechPart = sp.Name)
-                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
+                for i in ctx.MarraidhConlang.Inflection do
+                join ic in ctx.MarraidhConlang.InflectionClass on (i.Id = ic.Inflection)
+                join ia in ctx.MarraidhConlang.InflectionAxes on (i.Id = ia.Inflection)
+                join sp in ctx.MarraidhConlang.SpeechPart on (i.SpeechPart = sp.Name)
+                join a in ctx.MarraidhConlang.AxisName on (ia.Axis = a.Id)
                 where (a.Language = lid && sp.Language = lid)
                 select (i.Id, i.Name, i.SpeechPart, ic.Class, ia.Axis)
             }
@@ -293,10 +293,10 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
         logger.LogInformation("Getting rules to delete")
         let rulesToDelete =
             query {
-                for ia in ctx.Conlang.InflectionAxes do
-                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
-                join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
-                join r in ctx.Conlang.Rule on (av.Id = r.Axis)
+                for ia in ctx.MarraidhConlang.InflectionAxes do
+                join a in ctx.MarraidhConlang.AxisName on (ia.Axis = a.Id)
+                join av in ctx.MarraidhConlang.AxisValue on (a.Id = av.Axis)
+                join r in ctx.MarraidhConlang.Rule on (av.Id = r.Axis)
                 where (ia.Inflection = iid
                         && ia.Axis |<>| inflection.inflectionAxes
                         && r.Inflection = iid)
@@ -305,7 +305,7 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
         logger.LogInformation($"Deleting rules %A{rulesToDelete}")
         do!
             query {
-                for r in ctx.Conlang.Rule do
+                for r in ctx.MarraidhConlang.Rule do
                 where (r.Id |=| rulesToDelete)
             } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                             |> map ignore
@@ -313,7 +313,7 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
         logger.LogInformation("Getting axes")
         let axes =
             query {
-                for ia in ctx.Conlang.InflectionAxes do
+                for ia in ctx.MarraidhConlang.InflectionAxes do
                 where (ia.Inflection = iid)
                 select (ia.Axis)
             } |> Seq.toList |> List.distinct
@@ -321,10 +321,10 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
         logger.LogInformation($"Getting override rules for axes %A{axes}")
         let overrideRules =
             query {
-                for aro in ctx.Conlang.AxesRuleOverride do
-                join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
-                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
-                join ro in ctx.Conlang.RuleOverride on (aro.RuleOverride = ro.Id)
+                for aro in ctx.MarraidhConlang.AxesRuleOverride do
+                join av in ctx.MarraidhConlang.AxisValue on (aro.AxisValue = av.Id)
+                join a in ctx.MarraidhConlang.AxisName on (av.Axis = a.Id)
+                join ro in ctx.MarraidhConlang.RuleOverride on (aro.RuleOverride = ro.Id)
                 where (a.Id |=| axes && ro.Inflection = iid)
                 select (ro.Id)
             } |> Seq.toList |> List.distinct
@@ -333,7 +333,7 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
             logger.LogInformation("Deleting override rules")
             do!
                 query {
-                    for ro in ctx.Conlang.RuleOverride do
+                    for ro in ctx.MarraidhConlang.RuleOverride do
                     where (ro.Id |=| overrideRules)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -342,19 +342,19 @@ let rewriteInflectionRules (logger : ILogger) iid inflection =
 let checkInflectionData (logger : ILogger) lid inflection =
     let classes =
         query {
-            for c in ctx.Conlang.ClassValue do
+            for c in ctx.MarraidhConlang.ClassValue do
             where (c.Name |=| inflection.inflectionClasses && c.Language = lid)
             select c.Name
         } |> Set
     let axes =
         query {
-            for an in ctx.Conlang.AxisName do
+            for an in ctx.MarraidhConlang.AxisName do
             where (an.Id |=| inflection.inflectionAxes && an.Language = lid)
             select an.Id
         } |> Set
     let partOfSpeech =
         query {
-            for sp in ctx.Conlang.SpeechPart do
+            for sp in ctx.MarraidhConlang.SpeechPart do
             where (sp.Name = inflection.inflectionSpeechPart && sp.Language = lid)
             select sp.Name
         } |> Seq.tryHead
@@ -369,9 +369,9 @@ let putInflectionHandler (logger : ILogger) stoken iid inflection =
     async {
         let lid =
             query {
-                for i in ctx.Conlang.Inflection do
-                join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
-                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
+                for i in ctx.MarraidhConlang.Inflection do
+                join ia in ctx.MarraidhConlang.InflectionAxes on (i.Id = ia.Inflection)
+                join a in ctx.MarraidhConlang.AxisName on (ia.Axis = a.Id)
                 where (i.Id = iid)
                 select a.Language
             } |> Seq.tryHead
@@ -386,28 +386,28 @@ let putInflectionHandler (logger : ILogger) stoken iid inflection =
             do! rewriteInflectionRules logger iid inflection
             do!
                 query {
-                    for ic in ctx.Conlang.InflectionClass do
+                    for ic in ctx.MarraidhConlang.InflectionClass do
                     where (ic.Inflection = iid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
             do!
                 query {
-                    for ia in ctx.Conlang.InflectionAxes do
+                    for ia in ctx.MarraidhConlang.InflectionAxes do
                     where (ia.Inflection = iid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
             for c in inflection.inflectionClasses do
-                let classRow = ctx.Conlang.InflectionClass.Create()
+                let classRow = ctx.MarraidhConlang.InflectionClass.Create()
                 classRow.Class <- c
                 classRow.Inflection <- iid
                 ctx.SubmitUpdates()
             for a in inflection.inflectionAxes do
-                let aRow = ctx.Conlang.InflectionAxes.Create()
+                let aRow = ctx.MarraidhConlang.InflectionAxes.Create()
                 aRow.Axis <- a
                 aRow.Inflection <- iid
                 ctx.SubmitUpdates()
             query {
-                for i in ctx.Conlang.Inflection do
+                for i in ctx.MarraidhConlang.Inflection do
                 where (i.Id = iid)
             } |> Seq.iter (fun i ->
                 i.SpeechPart <- inflection.inflectionSpeechPart
@@ -419,7 +419,7 @@ let putInflectionHandler (logger : ILogger) stoken iid inflection =
             | [] -> ()
             | aid::_ ->
                 let lid = query {
-                    for a in ctx.Conlang.AxisName do
+                    for a in ctx.MarraidhConlang.AxisName do
                     where (a.Id = aid)
                     select a.Language
                 }
@@ -433,7 +433,7 @@ let postInflectionHandler (logger : ILogger) stoken inflection =
     async {
         let lid =
             query {
-                for a in ctx.Conlang.AxisName do
+                for a in ctx.MarraidhConlang.AxisName do
                 where (a.Id |=| inflection.inflectionAxes)
                 select a.Language
             } |> Seq.tryHead
@@ -444,20 +444,20 @@ let postInflectionHandler (logger : ILogger) stoken inflection =
             checkInflectionData logger (Option.defaultValue 0 lid) inflection
 
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-            let iRow = ctx.Conlang.Inflection.Create()
+            let iRow = ctx.MarraidhConlang.Inflection.Create()
             iRow.SpeechPart <- inflection.inflectionSpeechPart
             iRow.Name <- inflection.inflectionName
             ctx.SubmitUpdates()
-            let iId = ctx.Conlang.Inflection |> Seq.last
+            let iId = ctx.MarraidhConlang.Inflection |> Seq.last
 
             for a in inflection.inflectionAxes do
-                let aRow = ctx.Conlang.InflectionAxes.Create()
+                let aRow = ctx.MarraidhConlang.InflectionAxes.Create()
                 aRow.Axis <- a
                 aRow.Inflection <- iId.Id
                 ctx.SubmitUpdates()
 
             for c in inflection.inflectionClasses do
-                let classRow = ctx.Conlang.InflectionClass.Create()
+                let classRow = ctx.MarraidhConlang.InflectionClass.Create()
                 classRow.Class <- c
                 classRow.Inflection <- iId.Id
                 ctx.SubmitUpdates()
@@ -466,7 +466,7 @@ let postInflectionHandler (logger : ILogger) stoken inflection =
             | [] -> ()
             | aid::_ ->
                 let lid = query {
-                    for a in ctx.Conlang.AxisName do
+                    for a in ctx.MarraidhConlang.AxisName do
                     where (a.Id = aid)
                     select a.Language
                 }
@@ -480,9 +480,9 @@ let deleteInflectionHandler (logger : ILogger) stoken iid =
     async {
         let lid =
             query {
-                for i in ctx.Conlang.Inflection do
-                join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
-                join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
+                for i in ctx.MarraidhConlang.Inflection do
+                join ia in ctx.MarraidhConlang.InflectionAxes on (i.Id = ia.Inflection)
+                join a in ctx.MarraidhConlang.AxisName on (ia.Axis = a.Id)
                 select a.Language
             } |> Seq.tryHead
         let ouser = getUser logger stoken
@@ -490,7 +490,7 @@ let deleteInflectionHandler (logger : ILogger) stoken iid =
         | Some true ->
             do!
                 query {
-                    for i in ctx.Conlang.Inflection do
+                    for i in ctx.MarraidhConlang.Inflection do
                     where (i.Id = iid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -502,10 +502,10 @@ let getOverrideRulesHandler (logger : ILogger) i lid =
     async {
         let rules =
             query {
-                    for ro in ctx.Conlang.RuleOverride do
-                    join aro in ctx.Conlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
-                    join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
-                    join an in ctx.Conlang.AxisName on (av.Axis = an.Id)
+                    for ro in ctx.MarraidhConlang.RuleOverride do
+                    join aro in ctx.MarraidhConlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
+                    join av in ctx.MarraidhConlang.AxisValue on (aro.AxisValue = av.Id)
+                    join an in ctx.MarraidhConlang.AxisName on (av.Axis = an.Id)
                     where (an.Language = lid && ro.Inflection = i)
                     select (ro.Id, ro.Rule, av.Id)
             } |> Seq.toList
@@ -529,8 +529,8 @@ let postOverrideRulesHandler (logger : ILogger) stoken i rules =
                 | None -> None
                 | Some avid ->
                     query {
-                        for a in ctx.Conlang.AxisName do
-                        join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                        for a in ctx.MarraidhConlang.AxisName do
+                        join av in ctx.MarraidhConlang.AxisValue on (a.Id = av.Axis)
                         where (av.Id = avid)
                         select a.Language
                     } |> Seq.tryHead
@@ -540,20 +540,20 @@ let postOverrideRulesHandler (logger : ILogger) stoken i rules =
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             do!
                 query {
-                    for ro in ctx.Conlang.RuleOverride do
+                    for ro in ctx.MarraidhConlang.RuleOverride do
                     where (ro.Inflection = i)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
             for rule in rules do
-                let row = ctx.Conlang.RuleOverride.Create()
+                let row = ctx.MarraidhConlang.RuleOverride.Create()
                 row.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions)
                 row.Inflection <- i
                 ctx.SubmitUpdates()
 
-                let roId = ctx.Conlang.RuleOverride |> Seq.last
+                let roId = ctx.MarraidhConlang.RuleOverride |> Seq.last
 
                 for a in rule.overrideAxes do
-                    let aroRow = ctx.Conlang.AxesRuleOverride.Create()
+                    let aroRow = ctx.MarraidhConlang.AxesRuleOverride.Create()
                     aroRow.RuleOverride <- roId.Id
                     aroRow.AxisValue <- a
                     ctx.SubmitUpdates()
@@ -570,8 +570,8 @@ let putOverrideRuleHandler (logger : ILogger) stoken rid rule =
             | None -> None
             | Some avid ->
                 query {
-                    for a in ctx.Conlang.AxisName do
-                    join av in ctx.Conlang.AxisValue on (a.Id = av.Axis)
+                    for a in ctx.MarraidhConlang.AxisName do
+                    join av in ctx.MarraidhConlang.AxisValue on (a.Id = av.Axis)
                     where (av.Id = avid)
                     select a.Language
                 } |> Seq.tryHead
@@ -581,18 +581,18 @@ let putOverrideRuleHandler (logger : ILogger) stoken rid rule =
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             do!
                 query {
-                    for oa in ctx.Conlang.AxesRuleOverride do
+                    for oa in ctx.MarraidhConlang.AxesRuleOverride do
                     where (oa.RuleOverride = rid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
             query {
-                for r in ctx.Conlang.RuleOverride do
+                for r in ctx.MarraidhConlang.RuleOverride do
                 where (r.Id = rid)
             } |> Seq.iter (fun r -> r.Rule <- JsonSerializer.Serialize(rule.overrideRule, jsonOptions))
             ctx.SubmitUpdates()
 
             for a in rule.overrideAxes do
-                let aroRow = ctx.Conlang.AxesRuleOverride.Create()
+                let aroRow = ctx.MarraidhConlang.AxesRuleOverride.Create()
                 aroRow.RuleOverride <- rid
                 aroRow.AxisValue <- a
                 ctx.SubmitUpdates()
@@ -606,10 +606,10 @@ let deleteOverrideRuleHandler (logger : ILogger) stoken rid =
     async {
         let lid =
             query {
-                for ro in ctx.Conlang.RuleOverride do
-                join aro in ctx.Conlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
-                join av in ctx.Conlang.AxisValue on (aro.AxisValue = av.Id)
-                join a in ctx.Conlang.AxisName on (av.Axis = a.Id)
+                for ro in ctx.MarraidhConlang.RuleOverride do
+                join aro in ctx.MarraidhConlang.AxesRuleOverride on (ro.Id = aro.RuleOverride)
+                join av in ctx.MarraidhConlang.AxisValue on (aro.AxisValue = av.Id)
+                join a in ctx.MarraidhConlang.AxisName on (av.Axis = a.Id)
                 select a.Language
             } |> Seq.tryHead
         let ouser = getUser logger stoken
@@ -617,7 +617,7 @@ let deleteOverrideRuleHandler (logger : ILogger) stoken rid =
         | Some true ->
             do!
                 query {
-                    for r in ctx.Conlang.RuleOverride do
+                    for r in ctx.MarraidhConlang.RuleOverride do
                     where (r.Id = rid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -628,8 +628,8 @@ let deleteOverrideRuleHandler (logger : ILogger) stoken rid =
 let getAxesHandler (logger : ILogger) lid =
     async {
         let axes = query {
-            for an in ctx.Conlang.AxisName do
-            join av in !!ctx.Conlang.AxisValue on (an.Id = av.Axis)
+            for an in ctx.MarraidhConlang.AxisName do
+            join av in !!ctx.MarraidhConlang.AxisValue on (an.Id = av.Axis)
             where (an.Language = lid)
             select ((an.Id, an.Name), (av.Id, av.Name))
         }

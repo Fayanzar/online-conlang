@@ -31,7 +31,7 @@ let postRegisterUserHandler (logger : ILogger) loginInfo email : Async<unit> =
 
         let userExists =
             query {
-                for u in ctx.Conlang.User do
+                for u in ctx.MarraidhConlang.User do
                 where (u.Login = username)
                 select u.Id
             } |> Seq.tryHead
@@ -39,7 +39,7 @@ let postRegisterUserHandler (logger : ILogger) loginInfo email : Async<unit> =
         if Option.isSome userExists then
             failwith "user with such username already exists, try another username"
         else if validateEmail email then
-            let row = ctx.Conlang.User.Create()
+            let row = ctx.MarraidhConlang.User.Create()
             row.Login <- username
             row.Password <- hashedPassword
             row.Email <- email
@@ -58,7 +58,7 @@ let postLoginUserHandler (logger : ILogger) loginInfo : Async<SecurityToken> =
         let hasher = new PasswordHasher<string> ()
         let ohashedPasswordAndVerified =
             query {
-                for u in ctx.Conlang.User do
+                for u in ctx.MarraidhConlang.User do
                 where (u.Login = username)
                 select (u.Password, u.Verified)
             } |> Seq.tryHead
@@ -75,8 +75,8 @@ let postLoginUserHandler (logger : ILogger) loginInfo : Async<SecurityToken> =
                 if toBool isVerified then
                     let languages =
                         query {
-                            for u in ctx.Conlang.User do
-                            join ul in ctx.Conlang.UserLanguages on (u.Id = ul.User)
+                            for u in ctx.MarraidhConlang.User do
+                            join ul in ctx.MarraidhConlang.UserLanguages on (u.Id = ul.User)
                             where (u.Login = username)
                             select ul.Language
                         } |> Seq.toList
@@ -125,7 +125,7 @@ let postVerifyUserHandler (logger : ILogger) username verificationKey =
     async {
         let ouser =
             query {
-                for u in ctx.Conlang.User do
+                for u in ctx.MarraidhConlang.User do
                 where (u.Login = username && u.VerificationKey = Some verificationKey)
                 select u
             } |> Seq.tryHead
@@ -144,8 +144,8 @@ let postVerifyUserHandler (logger : ILogger) username verificationKey =
 
                 let languages =
                     query {
-                        for u in ctx.Conlang.User do
-                        join ul in ctx.Conlang.UserLanguages on (u.Id = ul.User)
+                        for u in ctx.MarraidhConlang.User do
+                        join ul in ctx.MarraidhConlang.UserLanguages on (u.Id = ul.User)
                         where (user.Id = u.Id)
                         select ul.Language
                     } |> Seq.toList
@@ -173,7 +173,7 @@ let postSendVerificationEmailHandler (logger : ILogger) stoken =
         | Some (_, username) ->
             let ouser =
                 query {
-                    for u in ctx.Conlang.User do
+                    for u in ctx.MarraidhConlang.User do
                     where (u.Login = username)
                     select u
                 } |> Seq.tryHead
@@ -196,7 +196,7 @@ let getUserHandler (logger : ILogger) stoken =
         | Some (uid, username) ->
             let isVerified =
                 query {
-                    for u in ctx.Conlang.User do
+                    for u in ctx.MarraidhConlang.User do
                     where (u.Id = uid)
                     select u.Verified
                     exactlyOneOrDefault

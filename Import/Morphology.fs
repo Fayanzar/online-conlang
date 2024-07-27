@@ -46,12 +46,12 @@ let inflectTransformations = new Dictionary<int * int, string Option * PartOfSpe
 
 let buildAxis iid aid =
     let axisName = query {
-                        for an in ctx.Conlang.AxisName do
+                        for an in ctx.MarraidhConlang.AxisName do
                         where (an.Id = aid)
                         select (an.Name)
                     } |> Seq.head
     let axisValues = query {
-                            for av in ctx.Conlang.AxisValue do
+                            for av in ctx.MarraidhConlang.AxisValue do
                             where (av.Axis = aid)
                             select (av.Id)
                         } |> Seq.toList
@@ -59,7 +59,7 @@ let buildAxis iid aid =
         fun avId ->
             let rules =
                 query {
-                    for r in ctx.Conlang.Rule do
+                    for r in ctx.MarraidhConlang.Rule do
                     where (r.Axis = avId && r.Inflection = iid)
                     select (r.Id, r.Rule)
                 } |> Seq.toList |> List.distinctBy fst |> map snd
@@ -73,7 +73,7 @@ let buildAxes iid (aidList : int list) =
     let flattenedIds = List.concat axisIds
     let cartIds = cartesian axisIds |> List.map Set
     let overrides = query {
-                        for aro in ctx.Conlang.AxesRuleOverride do
+                        for aro in ctx.MarraidhConlang.AxesRuleOverride do
                         where (aro.AxisValue |=| flattenedIds)
                         select (aro.AxisValue, aro.RuleOverride)
                     } |> Seq.groupBy (snd) |> Seq.toList |> map (fun (oId, p) -> (oId, p |> map fst |> toList))
@@ -82,7 +82,7 @@ let buildAxes iid (aidList : int list) =
         fun (rId, avIds) ->
             let (orules : Rule list) =
                 query {
-                    for ro in ctx.Conlang.RuleOverride do
+                    for ro in ctx.MarraidhConlang.RuleOverride do
                     where (ro.Id = rId && ro.Inflection = iid)
                     select (ro.Id, ro.Rule)
                 } |> Seq.toList |> List.distinctBy fst |> map snd
@@ -96,11 +96,11 @@ let buildAxes iid (aidList : int list) =
 let updateInflectTransformations lid =
     inflectTransformations.Clear()
     let inflections = query {
-        for i in ctx.Conlang.Inflection do
-        join sp in ctx.Conlang.SpeechPart on (i.SpeechPart = sp.Name)
-        join ic in ctx.Conlang.InflectionClass on (i.Id = ic.Inflection)
-        join ia in ctx.Conlang.InflectionAxes on (i.Id = ia.Inflection)
-        join a in ctx.Conlang.AxisName on (ia.Axis = a.Id)
+        for i in ctx.MarraidhConlang.Inflection do
+        join sp in ctx.MarraidhConlang.SpeechPart on (i.SpeechPart = sp.Name)
+        join ic in ctx.MarraidhConlang.InflectionClass on (i.Id = ic.Inflection)
+        join ia in ctx.MarraidhConlang.InflectionAxes on (i.Id = ia.Inflection)
+        join a in ctx.MarraidhConlang.AxisName on (ia.Axis = a.Id)
         where (a.Language = lid && sp.Language = lid)
         select (i.Id, i.Name, i.SpeechPart, ic.Class, ia.Axis)
     }

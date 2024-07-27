@@ -40,7 +40,7 @@ let updateUserLanguages uid langs =
 let updateUsersLanguages =
     let ulangs =
         query {
-            for ul in ctx.Conlang.UserLanguages do
+            for ul in ctx.MarraidhConlang.UserLanguages do
             select (ul.User, ul.Language)
         } |> Seq.groupBy fst
           |> Seq.map (fun (k, v) -> (k, Seq.map snd v |> Seq.toList))
@@ -101,7 +101,7 @@ let getUser (logger : ILogger) (stoken : SharedModels.SecurityToken) =
         | Some name ->
             let ouid =
                 query {
-                    for u in ctx.Conlang.User do
+                    for u in ctx.MarraidhConlang.User do
                     where (u.Login = name)
                     select u.Id
                 } |> Seq.tryHead
@@ -136,7 +136,7 @@ let sendVerificationEmail username =
     let subject = "Verify your email"
     let oemailAndKey =
         query {
-            for u in ctx.Conlang.User do
+            for u in ctx.MarraidhConlang.User do
             where (u.Login = username)
             select (u.Email, u.VerificationKey)
         } |> Seq.tryHead

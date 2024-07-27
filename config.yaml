@@ -4,7 +4,7 @@ jwt:
     audience: https://localhost:5001
     secret: fcrvBbXi1Aimu6sIiZMlcvIP9CqjYjVd
 db:
-    connectionString: "Server=localhost;Database=conlang;User=root;Password=password"
+    connectionString: "Server=localhost;Database=marraidh_conlang;User=root;Password=password"
 mail:
     smtpClient: mail.marraidh.com
     smtpPort: 465

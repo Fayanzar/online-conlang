@@ -22,7 +22,7 @@ let transcriptionTransformations = new Dictionary<int, Transformation list>()
 
 let updateTranscriptionTransformations lid =
     let transformations = query {
-                                for r in ctx.Conlang.TranscriptionRule do
+                                for r in ctx.MarraidhConlang.TranscriptionRule do
                                 where (r.Language = lid)
                             } |> Seq.map (fun r -> JsonSerializer.Deserialize(r.Rule, jsonOptions)) |> toList
     transcriptionTransformations[lid] <- transformations
@@ -132,9 +132,9 @@ let rec private buildNodes pc pList phonemesAndClasses =
 let updatePhonemeClasses lid =
     let phonemesAndClasses =
         query {
-            for p in ctx.Conlang.Phoneme do
-            join pcp in ctx.Conlang.PhonemeClassPhoneme on (p.Phoneme = pcp.Phoneme)
-            join pc in ctx.Conlang.PhonemeClass on (pcp.Class = pc.Id)
+            for p in ctx.MarraidhConlang.Phoneme do
+            join pcp in ctx.MarraidhConlang.PhonemeClassPhoneme on (p.Phoneme = pcp.Phoneme)
+            join pc in ctx.MarraidhConlang.PhonemeClass on (pcp.Class = pc.Id)
             where (pc.Language = lid)
             select ((pc.Key, pc.Parent), p.Phoneme)
         } |> Seq.groupBy fst |> Seq.map (fun ((cl, p), v) -> ((cl[0], p[0]), map snd v |> toList)) |> toList

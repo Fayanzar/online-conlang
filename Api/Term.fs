@@ -23,13 +23,13 @@ let postTermHandler (logger : ILogger) stoken lid termApi =
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             let! wordClasses =
                 query {
-                    for cv in ctx.Conlang.ClassValue do
+                    for cv in ctx.MarraidhConlang.ClassValue do
                     where (cv.Language = lid)
                     select cv.Name
                 } |> Seq.executeQueryAsync |> Async.AwaitTask
             let! partOfSpeech =
                 query {
-                    for p in ctx.Conlang.SpeechPart do
+                    for p in ctx.MarraidhConlang.SpeechPart do
                     where (p.Name = term.speechPart && p.Language = lid)
                     select p
                 } |> Seq.executeQueryAsync |> Async.AwaitTask
@@ -43,7 +43,7 @@ let postTermHandler (logger : ILogger) stoken lid termApi =
                     transaction.Complete()
                     failwith "part of speech does not exist"
                 | _  ->
-                    let row = ctx.Conlang.Term.Create()
+                    let row = ctx.MarraidhConlang.Term.Create()
                     row.Word <- term.word
                     row.Language <- lid
                     row.SpeechPart <- Some term.speechPart
@@ -63,10 +63,10 @@ let postTermHandler (logger : ILogger) stoken lid termApi =
 
                     ctx.SubmitUpdates()
 
-                    let tid = ctx.Conlang.Term |> Seq.last
+                    let tid = ctx.MarraidhConlang.Term |> Seq.last
 
                     for c in newWordClasses do
-                        let rowClass = ctx.Conlang.TermClass.Create()
+                        let rowClass = ctx.MarraidhConlang.TermClass.Create()
                         rowClass.Class <- c
                         rowClass.Term <- tid.Id
                         ctx.SubmitUpdates()
@@ -80,7 +80,7 @@ let deleteTermHandler (logger : ILogger) stoken tid =
     async {
         let lid =
             query {
-                for t in ctx.Conlang.Term do
+                for t in ctx.MarraidhConlang.Term do
                 where (t.Id = tid)
                 select t.Language
             } |> Seq.head
@@ -88,7 +88,7 @@ let deleteTermHandler (logger : ILogger) stoken tid =
         if userHasLanguage ouser lid then
             do!
                 query {
-                    for t in ctx.Conlang.Term do
+                    for t in ctx.MarraidhConlang.Term do
                     where (t.Id = tid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -101,7 +101,7 @@ let putTermHandler (logger : ILogger) stoken tid termApi =
         let term = parseTerm termApi
         let lid =
             query {
-                for t in ctx.Conlang.Term do
+                for t in ctx.MarraidhConlang.Term do
                 where (t.Id = tid)
                 select t.Language
             } |> Seq.head
@@ -110,13 +110,13 @@ let putTermHandler (logger : ILogger) stoken tid termApi =
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
             let wordClasses =
                 query {
-                    for cv in ctx.Conlang.ClassValue do
+                    for cv in ctx.MarraidhConlang.ClassValue do
                     where (cv.Name |=| term.wordClasses && cv.Language = lid)
                     select (cv)
                 } |> Seq.toList
             let partOfSpeech =
                 query {
-                    for p in ctx.Conlang.SpeechPart do
+                    for p in ctx.MarraidhConlang.SpeechPart do
                     where (p.Name = term.speechPart && p.Language = lid)
                     select (p)
                 } |> Seq.toList
@@ -129,7 +129,7 @@ let putTermHandler (logger : ILogger) stoken tid termApi =
                 failwith "part of speech does not exist"
             | _, _  ->
                 query {
-                    for t in ctx.Conlang.Term do
+                    for t in ctx.MarraidhConlang.Term do
                     where (t.Id = tid && t.Language = lid)
                 } |> Seq.iter (fun t ->
                     t.Word <- term.word
@@ -144,14 +144,14 @@ let putTermHandler (logger : ILogger) stoken tid termApi =
 
                 do!
                     query {
-                        for tc in ctx.Conlang.TermClass do
+                        for tc in ctx.MarraidhConlang.TermClass do
                         where (tc.Term = tid)
                     } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                     |> map ignore
 
                 wordClasses |> iter (
                     fun c ->
-                        let rowClass = ctx.Conlang.TermClass.Create()
+                        let rowClass = ctx.MarraidhConlang.TermClass.Create()
                         rowClass.Class <- c.Name
                         rowClass.Term <- tid
                         ctx.SubmitUpdates()
@@ -166,8 +166,8 @@ let getTermsHandler (logger : ILogger) lid =
     async {
         let terms =
             query {
-                for t in ctx.Conlang.Term do
-                join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
+                for t in ctx.MarraidhConlang.Term do
+                join tc in ctx.MarraidhConlang.TermClass on (t.Id = tc.Term)
                 where (t.Language = lid)
                 select (t, tc.Class)
             }
@@ -191,7 +191,7 @@ let postRebuildInflectionsHandler (logger : ILogger) stoken tid =
     async {
         let lid =
             query {
-                for t in ctx.Conlang.Term do
+                for t in ctx.MarraidhConlang.Term do
                 where (t.Id = tid)
                 select t.Language
             } |> Seq.head
@@ -199,15 +199,15 @@ let postRebuildInflectionsHandler (logger : ILogger) stoken tid =
         if userHasLanguage ouser lid then
             let termWithClasses =
                 query {
-                    for t in ctx.Conlang.Term do
-                    join tc in ctx.Conlang.TermClass on (t.Id = tc.Term)
+                    for t in ctx.MarraidhConlang.Term do
+                    join tc in ctx.MarraidhConlang.TermClass on (t.Id = tc.Term)
                     where (t.Id = tid)
                     select (t, tc.Class)
                 } |> Seq.toList
             let term = termWithClasses |> List.head |> fst
             let classes = termWithClasses |> map snd |> Set
             query {
-                for t in ctx.Conlang.Term do
+                for t in ctx.MarraidhConlang.Term do
                 where (t.Id = tid)
             } |> Seq.iter (fun t ->
                 match term.SpeechPart with

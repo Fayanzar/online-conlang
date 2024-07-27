@@ -24,25 +24,25 @@ let postLanguageHandler (logger : ILogger) stoken language : Async<SecurityToken
             return SecurityToken ""
         | Some (uid, name) ->
             use transaction = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled)
-            let lRow = ctx.Conlang.Language.Create()
+            let lRow = ctx.MarraidhConlang.Language.Create()
             lRow.Name <- language
             ctx.SubmitUpdates()
 
             let lastLanguage =
                 query {
-                    for l in ctx.Conlang.Language do
+                    for l in ctx.MarraidhConlang.Language do
                     select l.Id
                 } |> Seq.last
 
-            let uRow = ctx.Conlang.UserLanguages.Create()
+            let uRow = ctx.MarraidhConlang.UserLanguages.Create()
             uRow.User <- uid
             uRow.Language <- lastLanguage
             ctx.SubmitUpdates()
 
             let languages =
                 query {
-                    for u in ctx.Conlang.User do
-                    join ul in ctx.Conlang.UserLanguages on (u.Id = ul.User)
+                    for u in ctx.MarraidhConlang.User do
+                    join ul in ctx.MarraidhConlang.UserLanguages on (u.Id = ul.User)
                     select ul.Language
                 } |> Seq.toList
 
@@ -75,7 +75,7 @@ let deleteLanguageHandler (logger : ILogger) stoken lid =
             updateUserLanguages uid (List.except [lid] langs)
             do!
                 query {
-                    for l in ctx.Conlang.Language do
+                    for l in ctx.MarraidhConlang.Language do
                     where (l.Id = lid)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -86,7 +86,7 @@ let putLanguageHandler (logger : ILogger) stoken lid newName =
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
             query {
-                for l in ctx.Conlang.Language do
+                for l in ctx.MarraidhConlang.Language do
                 where (l.Id = lid)
             } |> Seq.iter (fun l -> l.Name <- newName)
             try
@@ -103,7 +103,7 @@ let getLanguagesHandler (logger : ILogger) =
     async {
         let! langs =
             query {
-                for l in ctx.Conlang.Language do
+                for l in ctx.MarraidhConlang.Language do
                 select (l.Id, l.Name)
             } |> Seq.executeQueryAsync |> Async.AwaitTask
         let langsMap = langs |> Seq.toList |> map (

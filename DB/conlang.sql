@@ -1,8 +1,8 @@
-CREATE DATABASE  IF NOT EXISTS `conlang` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
-USE `conlang`;
+CREATE DATABASE  IF NOT EXISTS `marraidh_conlang` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `marraidh_conlang`;
 -- MySQL dump 10.13  Distrib 8.0.38, for macos14 (arm64)
 --
--- Host: localhost    Database: conlang
+-- Host: localhost    Database: marraidh_conlang
 -- ------------------------------------------------------
 -- Server version	9.0.0
 

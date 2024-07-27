@@ -20,12 +20,12 @@ let postPhonemeClassHandler (logger : ILogger) stoken lid (cl : char) (p : char 
         if userHasLanguage ouser lid then
             let parent = option id 'P' p
             let classes = query {
-                for p in ctx.Conlang.PhonemeClass do
+                for p in ctx.MarraidhConlang.PhonemeClass do
                 where (p.Key = string cl && p.Language = lid)
             }
             if not <| Seq.isEmpty classes then failwith ^<| "class " + string cl + " already exists"
 
-            let row = ctx.Conlang.PhonemeClass.Create()
+            let row = ctx.MarraidhConlang.PhonemeClass.Create()
             row.Key <- string cl
             row.Language <- lid
             row.Parent <- string parent
@@ -45,14 +45,14 @@ let putPhonemeClassHandler (logger : ILogger) stoken lid (cl : char) (newCl : ch
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
             let classes = query {
-                for p in ctx.Conlang.PhonemeClass do
+                for p in ctx.MarraidhConlang.PhonemeClass do
                 where (p.Key = string newCl && p.Key <> string cl && p.Language = lid)
                 select (p.Key)
             }
             if not <| Seq.isEmpty classes then failwith ^<| "class " + string newCl + " already exists"
 
             query {
-                for p in ctx.Conlang.PhonemeClass do
+                for p in ctx.MarraidhConlang.PhonemeClass do
                 where (p.Key = string cl && p.Language = lid)
             } |> Seq.iter (fun p -> p.Key <- string newCl)
             try
@@ -71,7 +71,7 @@ let rec getClassesForDeletion lid (parents : string list) =
     | [] -> []
     | _ ->
         let classes = query {
-            for p in ctx.Conlang.PhonemeClass do
+            for p in ctx.MarraidhConlang.PhonemeClass do
             where (List.contains p.Parent parents && p.Language = lid)
             select (p.Key)
         }
@@ -84,7 +84,7 @@ let deletePhonemeClassHandler (logger : ILogger) stoken lid (cl : char) =
             let classes = getClassesForDeletion lid [string cl]
             do!
                 query {
-                    for p in ctx.Conlang.PhonemeClass do
+                    for p in ctx.MarraidhConlang.PhonemeClass do
                     where (List.contains p.Key classes)
                 } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                 |> map ignore
@@ -98,7 +98,7 @@ let rec private updateChildPhonemes cl pc (phonemes : Phoneme Set) =
     | Node (k, v, l) ->
         let phonemesSerialized = map (fun p -> JsonSerializer.Serialize(p, jsonOptions)) phonemes
         query {
-            for p in ctx.Conlang.PhonemeClassPhoneme do
+            for p in ctx.MarraidhConlang.PhonemeClassPhoneme do
             where (p.Class = cl && (not <| Set.contains p.Phoneme phonemesSerialized))
         } |> Seq.``delete all items from single table`` |> Async.AwaitTask |> Async.RunSynchronously |> ignore
         Node (k, v </Set.intersect/> phonemes, map (fun p -> updateChildPhonemes cl p phonemes) l)
@@ -108,7 +108,7 @@ let putPhonemesPhonemeClass (logger : ILogger) stoken lid (cl : char) (phonemes 
         let ouser = getUser logger stoken
         if userHasLanguage ouser lid then
             let classes = query {
-                                for p in ctx.Conlang.PhonemeClass do
+                                for p in ctx.MarraidhConlang.PhonemeClass do
                                 where (p.Key = string cl && p.Language = lid)
                                 select p.Id
                             } |> Seq.toList
@@ -122,13 +122,13 @@ let putPhonemesPhonemeClass (logger : ILogger) stoken lid (cl : char) (phonemes 
                     | Some (Node (_, v, _)) -> phonemes </Set.intersect/> v
                 do!
                     query {
-                        for p in ctx.Conlang.PhonemeClassPhoneme do
+                        for p in ctx.MarraidhConlang.PhonemeClassPhoneme do
                         where (p.Class = classId)
                         select p.Phoneme
                     } |> Seq.``delete all items from single table`` |> Async.AwaitTask
                                                                     |> map ignore
                 for p in allowedPhonemes do
-                    let row = ctx.Conlang.PhonemeClassPhoneme.Create()
+                    let row = ctx.MarraidhConlang.PhonemeClassPhoneme.Create()
                     row.Class <- classId
                     row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
                 try

@@ -220,19 +220,19 @@ let main args =
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
     let phonemes = query {
-        for p in ctx.Conlang.Phoneme do
+        for p in ctx.MarraidhConlang.Phoneme do
         select p
     }
     if Seq.isEmpty phonemes then
         for p in IPA.Consonants do
-            let row = ctx.Conlang.Phoneme.Create()
+            let row = ctx.MarraidhConlang.Phoneme.Create()
             row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
         for p in IPA.Vowels do
-            let row = ctx.Conlang.Phoneme.Create()
+            let row = ctx.MarraidhConlang.Phoneme.Create()
             row.Phoneme <- JsonSerializer.Serialize(p, jsonOptions)
         ctx.SubmitUpdates()
     let languages = query {
-        for l in ctx.Conlang.Language do
+        for l in ctx.MarraidhConlang.Language do
         select l.Id
     }
     for lid in (Seq.toList languages) do
