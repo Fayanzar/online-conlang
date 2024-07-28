@@ -143,7 +143,8 @@ let sendVerificationEmail username =
     match oemailAndKey with
     | None -> failwith "no such user"
     | Some (email, Some key) ->
-        let link = Uri(config.baseExternalUrl, $"/verify?username={username}&key={key}")
+        let escapedKey = Uri.EscapeDataString key
+        let link = Uri(config.baseExternalUrl, $"/verify?username={username}&key={escapedKey}")
         let body =
             $"<h2>Hello, {username}!</h2>
             <p>Thanks for registering at Marràidh Conlanging.

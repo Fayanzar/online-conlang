@@ -2,6 +2,8 @@ module OnlineConlang.App
 
 open SharedModels
 
+open Foundation
+
 open OnlineConlang.Api.Class
 open OnlineConlang.Api.Language
 open OnlineConlang.Api.SpeechPart
@@ -184,15 +186,13 @@ let errorHandler (ex : Exception) (logger : ILogger) =
 // ---------------------------------
 
 let configureCors (builder : CorsPolicyBuilder) =
+    let origins = config.cors.``allowed-origins``
+                |> Seq.map (fun uri -> uri.ToString().TrimEnd('/')) |> Seq.toArray
     builder
-        .WithOrigins(
-            "moz-extension://812691db-0ba9-4cc4-918a-9b2169390784",
-            "http://localhost:5173",
-            "http://localhost:5000",
-            "https://localhost:5001")
-       .AllowAnyMethod()
-       .AllowAnyHeader()
-       |> ignore
+        .WithOrigins(origins)
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        |> ignore
 
 let configureApp (app : IApplicationBuilder) =
     let env = app.ApplicationServices.GetService<IWebHostEnvironment>()
@@ -217,6 +217,7 @@ let configureLogging (builder : ILoggingBuilder) =
 
 [<EntryPoint>]
 let main args =
+    config.Load(@"config.yaml")
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
     let phonemes = query {
@@ -241,13 +242,15 @@ let main args =
 
     updateUsersLanguages
 
+    let urls = config.baseUrls
+            |> Seq.map (fun uri -> uri.ToString().TrimEnd('/')) |> Seq.toArray
     Host.CreateDefaultBuilder(args)
         .ConfigureWebHostDefaults(
             fun webHostBuilder ->
                 webHostBuilder
                     .UseContentRoot(contentRoot)
                     .UseWebRoot(webRoot)
-                    .UseUrls("https://localhost:5001")
+                    .UseUrls(urls)
                     .Configure(Action<IApplicationBuilder> configureApp)
                     .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)
