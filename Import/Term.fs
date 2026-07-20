@@ -17,6 +17,7 @@ type Term =
                           // [(inflectionName, (inflectionAxes, [(axesValues, word)])]
         inflection        : (string Option * ((string list) * ((int list) * string) list)) list Option
         transcription     : string Option
+        translation       : string Option
     }
     with
     member this.syllabifiedTranscription lid = map (syllabifyTranscription lid) this.transcription <*> (Some syllable)
@@ -57,4 +58,5 @@ let parseTerm (termApi : TermForAPI) =
       wordClasses = termApi.wordClasses
       inflection = termApi.inflection
       transcription = termApi.transcription
+      translation = termApi.translation
     }

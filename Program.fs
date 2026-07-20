@@ -22,6 +22,7 @@ open OnlineConlang.Import.User
 open System
 open System.IO
 open System.Text.Json
+open System.Text.Json.Serialization
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
@@ -209,7 +210,7 @@ let configureApp (app : IApplicationBuilder) =
 let configureServices (services : IServiceCollection) =
     services.AddCors()    |> ignore
     services.AddGiraffe() |> ignore
-    services.AddSingleton<Json.ISerializer>(SystemTextJson.Serializer(jsonOptions)) |> ignore
+    services.AddSingleton<Json.ISerializer>(Json.FsharpFriendlySerializer jsonFSharpOptions) |> ignore
 
 let configureLogging (builder : ILoggingBuilder) =
     builder.AddConsole()

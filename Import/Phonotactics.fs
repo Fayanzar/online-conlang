@@ -12,11 +12,12 @@ open System.Collections.Generic
 open System.Text.Json
 open System.Text.Json.Serialization
 
-let jsonOptions =
+let jsonFSharpOptions =
     JsonFSharpOptions.Default()
         .WithUnionExternalTag()
         .WithUnionNamedFields()
-        .ToJsonSerializerOptions()
+
+let jsonOptions = jsonFSharpOptions.ToJsonSerializerOptions()
 
 let transcriptionTransformations = new Dictionary<int, Transformation list>()
 
@@ -34,7 +35,7 @@ type PhonemeClasses =
     with
     static member Root = Node
                             ( 'P'
-                            , (map ConsonantPhoneme IPA.Consonants) ++ (map VowelPhoneme IPA.Vowels)
+                            , map ConsonantPhoneme IPA.Consonants ++ map VowelPhoneme IPA.Vowels
                             , empty
                             )
     static member AddChild pc n (k, v) =
@@ -137,7 +138,7 @@ let updatePhonemeClasses lid =
             join pc in ctx.MarraidhConlang.PhonemeClass on (pcp.Class = pc.Id)
             where (pc.Language = lid)
             select ((pc.Key, pc.Parent), p.Phoneme)
-        } |> Seq.groupBy fst |> Seq.map (fun ((cl, p), v) -> ((cl[0], p[0]), map snd v |> toList)) |> toList
+        } |> Seq.groupBy fst |> Seq.map (fun ((cl, p), v) -> (cl[0], p[0]), Seq.map snd v |> toList) |> toList
     let rootNode = PhonemeClasses.Root
     let nodes = buildNodes rootNode ['P'] phonemesAndClasses
     phonemeClasses[lid] <- nodes

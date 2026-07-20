@@ -4,3 +4,5 @@ bin
 obj
 .fake
 config.yaml
+
+DB/Connection.fs

@@ -2,6 +2,7 @@ module OnlineConlang.Api.SpeechPart
 
 open FSharpPlus
 
+open OnlineConlang.DB.Connection
 open OnlineConlang.DB.Context
 open OnlineConlang.Import.User
 

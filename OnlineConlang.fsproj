@@ -6,20 +6,21 @@
     <UseAppHost>false</UseAppHost>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Fable.Remoting.Giraffe" Version="5.14.0" />
-    <PackageReference Include="FSharp.Configuration" Version="2.0.0" />
-    <PackageReference Include="FSharp.SystemTextJson" Version="1.1.23" />
-    <PackageReference Include="FSharpPlus" Version="1.4.0" />
-    <PackageReference Include="Giraffe" Version="5.0.0" />
-    <PackageReference Include="Giraffe.ViewEngine" Version="1.3.*" />
-    <PackageReference Include="MailKit" Version="4.7.1.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="6.0.26" />
-    <PackageReference Include="MySql.Data" Version="8.0.33" />
-    <PackageReference Include="SQLProvider" Version="1.3.22" />
+    <PackageReference Include="Fable.Remoting.Giraffe" Version="6.1.0" />
+    <PackageReference Include="FSharp.Configuration" Version="3.0.0" />
+    <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
+    <PackageReference Include="FSharpPlus" Version="1.9.1" />
+    <PackageReference Include="Giraffe" Version="8.2.0" />
+    <PackageReference Include="Giraffe.ViewEngine" Version="1.4.*" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="SQLProvider.MySql" Version="1.5.26" />
+    <PackageReference Include="SQLProvider.MySqlConnector" Version="1.5.26" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Prelude.fs" />
     <Compile Include="Foundation.fs" />
+    <Compile Include="DB\Connection.fs" />
     <Compile Include="DB\Context.fs" />
     <Compile Include="Constants\Diacritics.fs" />
     <Compile Include="Constants\Consonants.fs" />

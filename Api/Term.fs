@@ -45,6 +45,7 @@ let postTermHandler (logger : ILogger) stoken lid termApi =
                 | _  ->
                     let row = ctx.MarraidhConlang.Term.Create()
                     row.Word <- term.word
+                    row.Translation <- term.translation
                     row.Language <- lid
                     row.SpeechPart <- Some term.speechPart
 
@@ -133,6 +134,7 @@ let putTermHandler (logger : ILogger) stoken tid termApi =
                     where (t.Id = tid && t.Language = lid)
                 } |> Seq.iter (fun t ->
                     t.Word <- term.word
+                    t.Translation <- term.translation
                     t.Language <- lid
                     t.SpeechPart <- Some term.speechPart
                     t.Transcription <- term.mkTranscription lid |> Some
@@ -182,6 +184,7 @@ let getTermsHandler (logger : ILogger) lid =
                   speechPart = option id "" t.SpeechPart
                   wordClasses = Seq.map snd tc |> Set
                   transcription = t.Transcription
+                  translation = t.Translation
                 }
             )
         return termsResponse

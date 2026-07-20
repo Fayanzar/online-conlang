@@ -310,6 +310,7 @@ DROP TABLE IF EXISTS `term`;
 CREATE TABLE `term` (
   `id` int NOT NULL AUTO_INCREMENT,
   `word` varchar(255) NOT NULL,
+  `translation` varchar(255) DEFAULT NULL,
   `transcription` varchar(255) DEFAULT NULL,
   `speech_part` varchar(255) DEFAULT NULL,
   `inflection` text,

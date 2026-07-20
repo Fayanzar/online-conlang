@@ -1,17 +1,16 @@
 module OnlineConlang.DB.Context
 
 open OnlineConlang.Foundation
+open OnlineConlang.DB.Connection
 
-open FSharp.Data.Sql
-
-[<Literal>]
-let connectionString = "Server=localhost;Database=marraidh_conlang;User=root;Password=password"
-
-[<Literal>]
-let private dbVendor = Common.DatabaseProviderTypes.MYSQL
+open FSharp.Data.Sql.MySqlConnector
+open FSharp.Data.Sql.Common
 
 [<Literal>]
-let private useOptTypes = Common.NullableColumnType.OPTION
+let private dbVendor = DatabaseProviderTypes.MYSQL
+
+[<Literal>]
+let private useOptTypes = NullableColumnType.OPTION
 
 type private Sql = SqlDataProvider<dbVendor, connectionString, UseOptionTypes = useOptTypes>
 
