@@ -22,7 +22,6 @@ open OnlineConlang.Import.User
 open System
 open System.IO
 open System.Text.Json
-open System.Text.Json.Serialization
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Cors.Infrastructure
 open Microsoft.AspNetCore.Hosting
@@ -218,7 +217,7 @@ let configureLogging (builder : ILoggingBuilder) =
 
 [<EntryPoint>]
 let main args =
-    config.Load(@"config.yaml")
+    config.Load @"config.yaml"
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
     let phonemes = query {
@@ -256,6 +255,7 @@ let main args =
                     .ConfigureServices(configureServices)
                     .ConfigureLogging(configureLogging)
                     |> ignore)
+        .UseSystemd()
         .Build()
         .Run()
     0
